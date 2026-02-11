@@ -362,6 +362,7 @@
   font-size: 13px;
   text-decoration: none;
   transition: opacity 0.15s;
+  width: fit-content;
 }
 
 .hsf-card-link:hover {
