@@ -40,6 +40,13 @@ export interface WidgetConfig {
   default_zoom: number
 }
 
+export interface RouteData {
+  geometry: [number, number][]
+  distance: number // km
+  duration: number // minutes
+  target: Stuetzpunkt
+}
+
 export interface WidgetState {
   config: WidgetConfig | null
   services: ServiceTyp[]

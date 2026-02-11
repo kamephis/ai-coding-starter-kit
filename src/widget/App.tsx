@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import type { WidgetConfig, ServiceTyp, Stuetzpunkt } from './types'
+import type { WidgetConfig, ServiceTyp, Stuetzpunkt, RouteData } from './types'
 import { I18nContext, detectLanguage, saveLanguage, translate, type Language } from './i18n'
 import { LeafletMap } from './components/LeafletMap'
 import { SearchBar } from './components/SearchBar'
@@ -8,6 +8,8 @@ import { RadiusSelector } from './components/RadiusSelector'
 import { GeolocationButton } from './components/GeolocationButton'
 import { LocationCard } from './components/LocationCard'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
+import { RouteButton } from './components/RouteButton'
+import { RoutePanel } from './components/RoutePanel'
 
 function haversineDistance(
   lat1: number, lon1: number,
@@ -41,6 +43,9 @@ export function App({ apiBase }: AppProps) {
   const [selectedStuetzpunkt, setSelectedStuetzpunkt] = useState<string | null>(null)
   const [hoveredStuetzpunkt, setHoveredStuetzpunkt] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(20)
+  const [routeData, setRouteData] = useState<RouteData | null>(null)
+  const [routeLoading, setRouteLoading] = useState(false)
+  const [routeError, setRouteError] = useState<string | null>(null)
 
   const setLang = useCallback((l: Language) => {
     setLangState(l)
@@ -160,6 +165,105 @@ export function App({ apiBase }: AppProps) {
     if (selectedRadius === 0) setSelectedRadius(config?.default_radius_km || 50)
   }
 
+  // Route: find nearest active stuetzpunkt and fetch OSRM route
+  const findNearestActive = useCallback((lat: number, lng: number): Stuetzpunkt | null => {
+    const active = stuetzpunkte.filter((sp) => sp.status === 'aktiv')
+    if (active.length === 0) return null
+
+    let nearest = active[0]
+    let minDist = haversineDistance(lat, lng, nearest.latitude, nearest.longitude)
+
+    for (let i = 1; i < active.length; i++) {
+      const d = haversineDistance(lat, lng, active[i].latitude, active[i].longitude)
+      if (d < minDist) {
+        minDist = d
+        nearest = active[i]
+      }
+    }
+    return nearest
+  }, [stuetzpunkte])
+
+  const fetchRoute = useCallback(async (
+    fromLat: number, fromLng: number,
+    toLat: number, toLng: number
+  ) => {
+    const url = `https://router.project-osrm.org/route/v1/driving/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`
+    const res = await fetch(url)
+    if (!res.ok) throw new Error('OSRM request failed')
+    const data = await res.json()
+    if (!data.routes || data.routes.length === 0) throw new Error('No route found')
+    const route = data.routes[0]
+    // GeoJSON coordinates are [lng, lat], convert to [lat, lng] for Leaflet
+    const geometry: [number, number][] = route.geometry.coordinates.map(
+      (c: [number, number]) => [c[1], c[0]]
+    )
+    return {
+      geometry,
+      distance: route.distance / 1000, // meters to km
+      duration: route.duration / 60, // seconds to minutes
+    }
+  }, [])
+
+  const handleRouteClick = useCallback(async () => {
+    // If route is active, close it
+    if (routeData) {
+      setRouteData(null)
+      setRouteError(null)
+      return
+    }
+
+    setRouteLoading(true)
+    setRouteError(null)
+
+    const doRoute = async (lat: number, lng: number) => {
+      const nearest = findNearestActive(lat, lng)
+      if (!nearest) {
+        setRouteError(t('route.noTarget'))
+        setRouteLoading(false)
+        return
+      }
+
+      try {
+        const result = await fetchRoute(lat, lng, nearest.latitude, nearest.longitude)
+        setRouteData({
+          ...result,
+          target: nearest,
+        })
+        setSelectedStuetzpunkt(nearest.id)
+      } catch {
+        setRouteError(t('route.error'))
+      }
+      setRouteLoading(false)
+    }
+
+    // Use existing userLocation or request geolocation
+    if (userLocation) {
+      await doRoute(userLocation.lat, userLocation.lng)
+    } else if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          setUserLocation(loc)
+          if (selectedRadius === 0) setSelectedRadius(config?.default_radius_km || 50)
+          await doRoute(loc.lat, loc.lng)
+        },
+        () => {
+          setRouteError(t('route.noLocation'))
+          setRouteLoading(false)
+        },
+        { enableHighAccuracy: false, timeout: 10000 }
+      )
+    } else {
+      setRouteError(t('route.noLocation'))
+      setRouteLoading(false)
+    }
+  }, [routeData, userLocation, findNearestActive, fetchRoute, t, selectedRadius, config?.default_radius_km])
+
+  const handleCloseRoute = useCallback(() => {
+    setRouteData(null)
+    setRouteError(null)
+  }, [])
+
   const handleMarkerClick = useCallback((id: string) => {
     setSelectedStuetzpunkt(id)
     const el = document.getElementById(`hsf-card-${id}`)
@@ -202,6 +306,7 @@ export function App({ apiBase }: AppProps) {
           <div className="hsf-toolbar-row">
             <SearchBar value={searchText} onChange={setSearchText} primaryColor={primaryColor} />
             <GeolocationButton onLocation={handleUserGeolocation} />
+            <RouteButton isLoading={routeLoading} isActive={!!routeData} onClick={handleRouteClick} />
             <RadiusSelector value={selectedRadius} onChange={setSelectedRadius} />
           </div>
           <ServiceFilterBar
@@ -212,6 +317,28 @@ export function App({ apiBase }: AppProps) {
             primaryColor={primaryColor}
           />
         </div>
+
+        {/* Route error */}
+        {routeError && (
+          <div className="hsf-route-error">
+            <span>{routeError}</span>
+            <button type="button" className="hsf-route-error-close" onClick={() => setRouteError(null)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Route panel */}
+        {routeData && userLocation && (
+          <RoutePanel
+            route={routeData}
+            userLocation={userLocation}
+            primaryColor={primaryColor}
+            onClose={handleCloseRoute}
+          />
+        )}
 
         {/* Result count */}
         <div className="hsf-result-count">
@@ -233,6 +360,8 @@ export function App({ apiBase }: AppProps) {
               selectedStuetzpunkt={selectedStuetzpunkt}
               hoveredStuetzpunkt={hoveredStuetzpunkt}
               onMarkerClick={handleMarkerClick}
+              routeGeometry={routeData?.geometry}
+              routeTargetId={routeData?.target.id}
             />
           </div>
 

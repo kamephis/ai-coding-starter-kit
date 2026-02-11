@@ -13,6 +13,8 @@ interface LeafletMapProps {
   selectedStuetzpunkt: string | null
   hoveredStuetzpunkt: string | null
   onMarkerClick: (id: string) => void
+  routeGeometry?: [number, number][] | null
+  routeTargetId?: string | null
 }
 
 function createMarkerIcon(color: string, isHighlighted: boolean) {
@@ -41,6 +43,8 @@ export function LeafletMap({
   selectedStuetzpunkt,
   hoveredStuetzpunkt,
   onMarkerClick,
+  routeGeometry,
+  routeTargetId,
 }: LeafletMapProps) {
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
@@ -48,6 +52,7 @@ export function LeafletMap({
   const markersRef = useRef<L.LayerGroup | null>(null)
   const circleRef = useRef<L.Circle | null>(null)
   const userMarkerRef = useRef<L.CircleMarker | null>(null)
+  const routeLineRef = useRef<L.Polyline | null>(null)
 
   // Initialize map
   useEffect(() => {
@@ -87,11 +92,12 @@ export function LeafletMap({
     stuetzpunkte.forEach((sp) => {
       const isSelected = sp.id === selectedStuetzpunkt
       const isHovered = sp.id === hoveredStuetzpunkt
+      const isRouteTarget = sp.id === routeTargetId
       const color = sp.status === 'temporaer_geschlossen' ? '#9ca3af' : primaryColor
 
       const marker = L.marker([sp.latitude, sp.longitude], {
-        icon: createMarkerIcon(color, isSelected || isHovered),
-        zIndexOffset: isSelected || isHovered ? 1000 : 0,
+        icon: createMarkerIcon(color, isSelected || isHovered || isRouteTarget),
+        zIndexOffset: isSelected || isHovered || isRouteTarget ? 1000 : 0,
       })
 
       const services = sp.stuetzpunkt_services
@@ -127,7 +133,7 @@ export function LeafletMap({
     if (bounds.length > 0 && !userLocation) {
       map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30], maxZoom: 13 })
     }
-  }, [stuetzpunkte, primaryColor, selectedStuetzpunkt, hoveredStuetzpunkt, onMarkerClick, t, userLocation])
+  }, [stuetzpunkte, primaryColor, selectedStuetzpunkt, hoveredStuetzpunkt, onMarkerClick, t, userLocation, routeTargetId])
 
   // User location marker + radius circle
   useEffect(() => {
@@ -169,6 +175,29 @@ export function LeafletMap({
       }
     }
   }, [userLocation, selectedRadius, primaryColor])
+
+  // Route polyline
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (routeLineRef.current) {
+      map.removeLayer(routeLineRef.current)
+      routeLineRef.current = null
+    }
+
+    if (routeGeometry && routeGeometry.length > 0) {
+      const latLngs = routeGeometry.map(([lat, lng]) => L.latLng(lat, lng))
+      routeLineRef.current = L.polyline(latLngs, {
+        color: primaryColor,
+        weight: 4,
+        opacity: 0.8,
+        dashArray: '8 6',
+      }).addTo(map)
+
+      map.fitBounds(routeLineRef.current.getBounds(), { padding: [40, 40] })
+    }
+  }, [routeGeometry, primaryColor])
 
   return (
     <div
