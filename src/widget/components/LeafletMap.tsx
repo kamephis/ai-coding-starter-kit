@@ -130,10 +130,27 @@ export function LeafletMap({
       bounds.push([sp.latitude, sp.longitude])
     })
 
-    if (bounds.length > 0 && !userLocation) {
+    if (bounds.length > 0 && !userLocation && !selectedStuetzpunkt) {
       map.fitBounds(L.latLngBounds(bounds), { padding: [30, 30], maxZoom: 13 })
     }
   }, [stuetzpunkte, primaryColor, selectedStuetzpunkt, hoveredStuetzpunkt, onMarkerClick, t, userLocation, routeTargetId])
+
+  // Fly to selected stuetzpunkt on card click
+  const prevSelectedRef = useRef<string | null>(null)
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !selectedStuetzpunkt) {
+      prevSelectedRef.current = selectedStuetzpunkt
+      return
+    }
+    if (selectedStuetzpunkt === prevSelectedRef.current) return
+    prevSelectedRef.current = selectedStuetzpunkt
+
+    const sp = stuetzpunkte.find((s) => s.id === selectedStuetzpunkt)
+    if (!sp) return
+
+    map.flyTo([sp.latitude, sp.longitude], 14, { duration: 0.8 })
+  }, [selectedStuetzpunkt, stuetzpunkte])
 
   // User location marker + radius circle
   useEffect(() => {
