@@ -391,6 +391,13 @@
   color: var(--hsf-primary-dark) !important;
 }
 
+.hsf-emergency-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .hsf-card-services {
   display: flex;
   flex-wrap: wrap;

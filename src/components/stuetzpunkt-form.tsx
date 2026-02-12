@@ -29,6 +29,7 @@ interface StuetzpunktData {
   ort: string
   land: string
   telefon: string
+  notfallnummer: string
   email: string
   website: string
   bild_url: string
@@ -49,6 +50,7 @@ const defaultData: StuetzpunktData = {
   ort: '',
   land: 'CH',
   telefon: '',
+  notfallnummer: '',
   email: '',
   website: '',
   bild_url: '',
@@ -331,6 +333,16 @@ export function StuetzpunktForm({ initialData, isEdit = false }: StuetzpunktForm
                 onChange={(e) => update('email', e.target.value)}
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="notfallnummer">Notfallnummer</Label>
+            <Input
+              id="notfallnummer"
+              type="tel"
+              value={data.notfallnummer}
+              onChange={(e) => update('notfallnummer', e.target.value)}
+              placeholder="+41 800 123 45 67"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="website">Website</Label>

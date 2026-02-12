@@ -19,6 +19,7 @@ export interface Stuetzpunkt {
   land: string
   telefon: string
   email: string | null
+  notfallnummer: string | null
   website: string | null
   bild_url: string | null
   latitude: number

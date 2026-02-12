@@ -10,6 +10,7 @@ export const it = {
   'map.myLocation': 'La mia posizione',
   'map.radius': 'Raggio',
   'card.phone': 'Telefono',
+  'card.emergency': 'Emergenza',
   'card.email': 'E-mail',
   'card.website': 'Sito web',
   'card.closed': 'Temporaneamente chiuso',

@@ -10,6 +10,7 @@ const UpdateStuetzpunktSchema = z.object({
   ort: z.string().min(1).optional(),
   land: z.string().min(1).optional(),
   telefon: z.string().min(1).optional(),
+  notfallnummer: z.string().optional().or(z.literal('')).nullable(),
   email: z.string().email().optional().or(z.literal('')).nullable(),
   website: z.string().url().optional().or(z.literal('')).nullable(),
   bild_url: z.string().optional().or(z.literal('')).nullable(),
@@ -72,6 +73,11 @@ export async function PUT(
   }
 
   const { service_ids, ...updateData } = parsed.data
+
+  // Normalize notfallnummer: empty/whitespace → null
+  if ('notfallnummer' in updateData) {
+    updateData.notfallnummer = updateData.notfallnummer?.trim() || null
+  }
 
   // Stützpunkt aktualisieren
   const { data, error } = await supabase

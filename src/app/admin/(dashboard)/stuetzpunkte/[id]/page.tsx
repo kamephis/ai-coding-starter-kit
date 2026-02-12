@@ -15,6 +15,7 @@ interface StuetzpunktData {
   ort: string
   land: string
   telefon: string
+  notfallnummer: string
   email: string
   website: string
   bild_url: string
@@ -50,6 +51,7 @@ export default function EditStuetzpunktPage() {
           ort: sp.ort,
           land: sp.land,
           telefon: sp.telefon,
+          notfallnummer: sp.notfallnummer || '',
           email: sp.email,
           website: sp.website || '',
           bild_url: sp.bild_url || '',

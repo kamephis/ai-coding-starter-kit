@@ -10,6 +10,7 @@ const CreateStuetzpunktSchema = z.object({
   ort: z.string().min(1, 'Ort ist erforderlich'),
   land: z.string().min(1, 'Land ist erforderlich').default('CH'),
   telefon: z.string().min(1, 'Telefon ist erforderlich'),
+  notfallnummer: z.string().optional().or(z.literal('')).nullable(),
   email: z.string().email('Ungültige E-Mail-Adresse').optional().or(z.literal('')).nullable(),
   website: z.string().url().optional().or(z.literal('')),
   bild_url: z.string().optional().or(z.literal('')),
@@ -96,6 +97,7 @@ export async function POST(request: Request) {
     .insert({
       ...stuetzpunktData,
       email: stuetzpunktData.email || null,
+      notfallnummer: stuetzpunktData.notfallnummer?.trim() || null,
       website: stuetzpunktData.website || null,
       bild_url: stuetzpunktData.bild_url || null,
     })
