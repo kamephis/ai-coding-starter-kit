@@ -450,7 +450,42 @@ export default function CsvImportPage() {
       (r) => r.status === 'duplicate' && r.duplicateAction === 'skip'
     ).length
 
+    // BUG-1 fix: Track which fields were actually mapped by the user
+    const mappedFieldNames = new Set(
+      mappings
+        .filter((m) => m.targetField !== '_ignore')
+        .map((m) => m.targetField)
+    )
+
     const apiRows = rowsToImport.map((r) => {
+      const isUpdate = r.status === 'duplicate'
+
+      if (isUpdate) {
+        // For updates, only send fields that were actually mapped
+        const data: Record<string, unknown> = {}
+        for (const field of mappedFieldNames) {
+          const value = r.mappedData[field]
+          if (value === undefined) continue
+          if (field === 'latitude' || field === 'longitude') {
+            if (value.trim()) data[field] = parseFloat(value)
+          } else if (field === 'email' || field === 'notfallnummer' || field === 'website') {
+            data[field] = value.trim() || null
+          } else if (field === 'status') {
+            if (value.trim()) data[field] = value.trim().toLowerCase()
+          } else if (field === 'oeffnungszeiten_typ') {
+            if (value.trim()) data[field] = value.trim().toLowerCase()
+          } else {
+            data[field] = value.trim()
+          }
+        }
+        return {
+          action: 'update' as const,
+          existingId: r.duplicateExisting?.id ?? '',
+          data,
+        }
+      }
+
+      // For inserts, send all fields with defaults
       const data: Record<string, unknown> = {
         name: r.mappedData.name?.trim() ?? '',
         strasse: r.mappedData.strasse?.trim() ?? '',
@@ -467,18 +502,15 @@ export default function CsvImportPage() {
         oeffnungszeiten_von: r.mappedData.oeffnungszeiten_von?.trim() || null,
         oeffnungszeiten_bis: r.mappedData.oeffnungszeiten_bis?.trim() || null,
       }
-
-      // Parse coordinates
       if (r.mappedData.latitude?.trim()) {
         data.latitude = parseFloat(r.mappedData.latitude)
       }
       if (r.mappedData.longitude?.trim()) {
         data.longitude = parseFloat(r.mappedData.longitude)
       }
-
       return {
-        action: r.status === 'duplicate' ? ('update' as const) : ('insert' as const),
-        existingId: r.duplicateExisting?.id,
+        action: 'insert' as const,
+        existingId: undefined,
         data,
       }
     })
@@ -505,17 +537,10 @@ export default function CsvImportPage() {
 
       setImportProgress(90)
 
-      // Trigger geocoding for newly imported entries without coordinates
-      const rowsNeedingGeocoding = rowsToImport.filter(
-        (r) =>
-          r.status === 'valid' &&
-          !r.mappedData.latitude?.trim() &&
-          !r.mappedData.longitude?.trim()
-      )
-
-      if (rowsNeedingGeocoding.length > 0) {
-        // Fire and forget geocoding - don't block the result display
-        geocodeImportedRows(rowsNeedingGeocoding)
+      // BUG-3 fix: Geocode newly created entries that lack coordinates
+      // The API returns createdEntries with IDs and address data
+      if (result.createdEntries && result.createdEntries.length > 0) {
+        geocodeAndSaveCoordinates(result.createdEntries)
       }
 
       setImportResult({
@@ -535,12 +560,24 @@ export default function CsvImportPage() {
     setIsImporting(false)
   }
 
-  // Geocode imported rows asynchronously (1 request per second)
-  const geocodeImportedRows = async (rows: ImportRow[]) => {
-    for (const row of rows) {
-      const address = `${row.mappedData.strasse} ${row.mappedData.hausnummer} ${row.mappedData.plz} ${row.mappedData.ort} ${row.mappedData.land || 'CH'}`
+  // BUG-3 fix: Geocode entries and save coordinates to DB via PUT
+  const geocodeAndSaveCoordinates = async (
+    entries: Array<{ id: string; strasse: string; hausnummer: string; plz: string; ort: string; land: string }>
+  ) => {
+    for (const entry of entries) {
+      const address = `${entry.strasse} ${entry.hausnummer} ${entry.plz} ${entry.ort} ${entry.land}`
       try {
-        await fetch(`/api/geocode?address=${encodeURIComponent(address)}`)
+        const geoResponse = await fetch(`/api/geocode?address=${encodeURIComponent(address)}`)
+        if (geoResponse.ok) {
+          const { latitude, longitude } = await geoResponse.json()
+          if (latitude && longitude) {
+            await fetch(`/api/stuetzpunkte/${entry.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ latitude, longitude }),
+            })
+          }
+        }
       } catch {
         // Geocoding errors are non-critical
       }
