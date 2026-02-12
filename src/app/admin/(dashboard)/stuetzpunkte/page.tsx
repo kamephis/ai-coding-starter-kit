@@ -30,6 +30,7 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
+  FileSpreadsheet,
   Loader2,
   MapPin,
   Pencil,
@@ -166,12 +167,20 @@ export default function StuetzpunktePage() {
             Verwalten Sie Ihre Standorte und Filialen
           </p>
         </div>
-        <Button asChild>
-          <Link href="/admin/stuetzpunkte/neu">
-            <Plus className="mr-2 h-4 w-4" />
-            Neuer Stützpunkt
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/admin/stuetzpunkte/import">
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              CSV-Import
+            </Link>
+          </Button>
+          <Button asChild>
+            <Link href="/admin/stuetzpunkte/neu">
+              <Plus className="mr-2 h-4 w-4" />
+              Neuer Stützpunkt
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {error && (
