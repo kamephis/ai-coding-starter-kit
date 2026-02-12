@@ -34,6 +34,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url)
   const search = searchParams.get('search') || ''
+  const filter = searchParams.get('filter') || ''
   const sortBy = searchParams.get('sortBy') || 'name'
   const sortDir = searchParams.get('sortDir') === 'desc' ? false : true
   const page = parseInt(searchParams.get('page') || '1')
@@ -46,6 +47,11 @@ export async function GET(request: Request) {
 
   if (search) {
     query = query.or(`name.ilike.%${search}%,plz.ilike.%${search}%,ort.ilike.%${search}%`)
+  }
+
+  // Filter for incomplete entries (missing hausnummer or coordinates)
+  if (filter === 'incomplete') {
+    query = query.or('hausnummer.eq.,hausnummer.is.null,latitude.is.null')
   }
 
   const validSortColumns = ['name', 'plz', 'ort', 'status', 'created_at']

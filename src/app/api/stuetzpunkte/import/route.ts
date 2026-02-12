@@ -7,7 +7,7 @@ const InsertRowSchema = z.object({
   data: z.object({
     name: z.string().min(1),
     strasse: z.string().min(1),
-    hausnummer: z.string().min(1),
+    hausnummer: z.string().default(''),
     plz: z.string().min(1),
     ort: z.string().min(1),
     land: z.string().default('CH'),

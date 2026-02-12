@@ -220,3 +220,351 @@ Bestehende Packages (werden wiederverwendet):
 
 - "CSV-Import" Button auf der Stützpunkte-Liste (/admin/stuetzpunkte)
 - Führt zu /admin/stuetzpunkte/import
+
+---
+
+## QA Test Results
+
+**Tested:** 2026-02-12
+**Method:** Code Review gegen Acceptance Criteria (statische Analyse)
+**Reviewed Files:**
+- `src/app/admin/(dashboard)/stuetzpunkte/import/page.tsx` (Wizard UI, 1023 Zeilen)
+- `src/app/api/stuetzpunkte/check-duplicates/route.ts` (Duplikat-Check API, 77 Zeilen)
+- `src/app/api/stuetzpunkte/import/route.ts` (Import API, 145 Zeilen)
+- `src/app/admin/(dashboard)/stuetzpunkte/page.tsx` (Uebersichtsseite mit Button, 381 Zeilen)
+- `src/app/api/geocode/route.ts` (Geocoding API, 47 Zeilen)
+
+---
+
+## Acceptance Criteria Status
+
+### AC-1: Datei-Upload
+
+- [x] Auf der Admin-Seite gibt es einen Import-Button auf der Stuetzpunkte-Seite
+  - Button mit `FileSpreadsheet`-Icon und Text "CSV-Import" in `stuetzpunkte/page.tsx` Zeile 171-176
+  - Verlinkt korrekt zu `/admin/stuetzpunkte/import`
+- [x] Der Admin kann eine `.csv`-Datei per Datei-Dialog oder Drag & Drop hochladen
+  - Drag & Drop via `onDragOver`/`onDragLeave`/`onDrop` Handler (Zeile 616-628)
+  - Datei-Dialog via hidden `<input type="file" accept=".csv">` (Zeile 641-648)
+- [x] Dateien bis 1.000 Zeilen werden unterstuetzt
+  - `MAX_ROWS = 1000` Konstante (Zeile 95), Pruefung in `parseFile` (Zeile 259-261)
+- [x] Das Trennzeichen (Komma, Semikolon, Tab) wird automatisch erkannt
+  - Papa Parse mit `header: true` erkennt Trennzeichen automatisch (Zeile 244-246)
+- [x] Die Zeichenkodierung UTF-8 wird unterstuetzt; UTF-8 BOM wird korrekt verarbeitet
+  - Papa Parse mit `encoding: 'UTF-8'` (Zeile 247), BOM-Handling ist in Papa Parse integriert
+- [x] Bei ungueltigen Dateien wird eine verstaendliche Fehlermeldung angezeigt
+  - Pruefungen: nicht `.csv` (Zeile 234), zu gross (Zeile 239), keine Header (Zeile 249), keine Daten (Zeile 254), zu viele Zeilen (Zeile 259)
+
+### AC-2: Feldmapping
+
+- [x] Nach dem Upload werden alle erkannten CSV-Spaltenkopfe angezeigt
+  - Mapping-Tabelle zeigt alle Headers (Zeile 692-744)
+- [x] Pro CSV-Spalte gibt es ein Dropdown mit allen verfuegbaren Ziel-Feldern
+  - Alle Felder in `TARGET_FIELDS` (Zeile 73-91): name, strasse, hausnummer, plz, ort, telefon, land, email, website, notfallnummer, latitude, longitude, oeffnungszeiten_typ/von/bis, status, "Nicht importieren"
+- [x] Jedes Zielfeld kann nur einmal zugeordnet werden (keine Doppelbelegung)
+  - `assignedTargets` Set verhindert Doppelbelegung (Zeile 330-332), Items werden als `disabled` markiert (Zeile 723-725, 731)
+- [x] Der Admin sieht neben jedem Dropdown eine Vorschau der ersten 3 Werte
+  - `getPreviewValues` zeigt erste 3 nicht-leere Werte (Zeile 337-342), als Badges angezeigt (Zeile 700-709)
+- [x] Pflichtfelder sind als solche markiert
+  - Mit `*` gekennzeichnet in Dropdown: `{'required' in field && field.required && ' *'}` (Zeile 733)
+- [x] Der "Weiter"-Button ist erst aktiv, wenn alle Pflichtfelder zugeordnet sind
+  - `disabled={!allRequiredMapped}` (Zeile 753)
+- [x] Auto-Mapping Heuristik versucht Spalten automatisch zuzuordnen
+  - `guessTargetField` Funktion (Zeile 100-128) mit umfangreichen Regex-Patterns
+
+### AC-3: Vorschau & Validierung
+
+- [x] Nach dem Mapping wird eine Vorschau-Tabelle aller Zeilen angezeigt
+  - ScrollArea mit Tabelle (Zeile 838-920)
+- [x] Jede Zeile hat einen Validierungsstatus: gueltig, Warnung (Duplikat), ungueltig
+  - Status-Icons: CheckCircle2 (gruen), AlertTriangle (amber), XCircle (rot) (Zeile 868-876)
+- [x] Ungueltige Zeilen zeigen den Grund an
+  - Fehlertexte in `row.errors.join('; ')` (Zeile 888-890)
+- [x] Validierungsregeln implementiert:
+  - [x] Pflichtfelder duerfen nicht leer sein (Zeile 137-141)
+  - [x] `status` muss `aktiv` oder `temporaer_geschlossen` sein (Zeile 144-149)
+  - [x] `oeffnungszeiten_typ` muss `tagsueber` oder `24h` sein (Zeile 151-156)
+  - [x] `email` muss gueltiges Format haben (Zeile 158-162)
+  - [x] `latitude`/`longitude` muessen numerisch sein (Zeile 164-176)
+- [x] Die Tabelle ist scrollbar bei vielen Zeilen
+  - `ScrollArea` mit `h-[500px]` (Zeile 838)
+- [x] Es gibt eine Zusammenfassungsleiste
+  - Badges: "X gueltig, Y Duplikate, Z ungueltig" (Zeile 783-796)
+
+### AC-4: Duplikat-Erkennung & -Behandlung
+
+- [x] Ein Duplikat wird erkannt bei gleichem `name` UND gleicher `plz`
+  - Server-Check via `/api/stuetzpunkte/check-duplicates` (Zeile 379), Key: `name_lower::plz` (Zeile 390)
+- [x] Duplikate werden in der Vorschau als Warnung markiert und zeigen bestehenden Eintrag an
+  - Amber-Hintergrund und Duplikat-Info (Zeile 892-895)
+- [x] Pro Duplikat kann der Admin waehlen: "Ueberschreiben" oder "Ueberspringen"
+  - Select mit zwei Optionen (Zeile 900-914)
+- [x] Es gibt Bulk-Aktionen: "Alle Duplikate ueberschreiben" / "Alle Duplikate ueberspringen"
+  - `setAllDuplicateAction` Buttons (Zeile 800-816)
+- [x] Beim Ueberschreiben werden die gemappten Felder aktualisiert
+  - Update via `supabase.update()` mit allen Datenfeldern (Import API Zeile 115-123)
+- [ ] **BUG-1:** Beim Update werden ALLE Felder ueberschrieben, nicht nur die gemappten
+  - Die Import API bekommt `row.data` mit allen Feldern inkl. Defaults. Nicht gemappte Felder erhalten Default-Werte (z.B. `land: 'CH'`, `status: 'aktiv'`), die bestehende Werte ueberschreiben koennen
+
+### AC-5: Import-Ausfuehrung
+
+- [x] Der Admin startet den Import mit einem "Importieren"-Button
+  - Button mit Label "X Stuetzpunkte importieren" (Zeile 928-938)
+- [x] Waehrend des Imports wird ein Fortschrittsbalken angezeigt
+  - `Progress` Komponente mit `importProgress` State (Zeile 833-835)
+- [ ] **BUG-2:** Der Import erfolgt NICHT transaktional
+  - Die Import API (route.ts) fuehrt Batch-Insert durch, und bei Fehler einzelne Inserts als Fallback. Es gibt keinen Rollback-Mechanismus. Supabase Client unterstuetzt keine echten Transaktionen direkt. Teile des Imports koennen erfolgreich sein, waehrend andere fehlschlagen.
+- [ ] **BUG-3:** Geocoding nach Import funktioniert nicht
+  - `geocodeImportedRows` (Zeile 539-550) ruft `/api/geocode` auf, aber verwertet das Ergebnis NICHT. Die Koordinaten werden nur zurueckgegeben, aber nie in die Datenbank geschrieben. Es fehlt ein anschliessender `.update()` Aufruf.
+
+### AC-6: Import-Ergebnis
+
+- [x] Nach Abschluss wird eine Zusammenfassung angezeigt
+  - Vier Karten: Neu angelegt, Aktualisiert, Uebersprungen, Fehlgeschlagen (Zeile 959-976)
+- [x] Fehlerdetails werden angezeigt
+  - Alert mit Fehlerliste (Zeile 978-991)
+- [x] Der Admin kann zur Stuetzpunkte-Liste navigieren
+  - "Zur Stuetzpunkte-Liste" Button (Zeile 994-996)
+- [x] "Neuen Import starten" Option verfuegbar
+  - Button setzt alle States zurueck (Zeile 999-1016)
+
+---
+
+## Edge Cases Status
+
+### EC-1: Leere Zeilen in CSV
+- [x] Leere Zeilen werden automatisch uebersprungen
+  - Papa Parse `skipEmptyLines: true` (Zeile 246) + zusaetzlicher Filter (Zeile 277-279)
+
+### EC-2: Spaltenkopfe mit Leerzeichen/Sonderzeichen
+- [x] Werden korrekt angezeigt; Trimming erfolgt automatisch
+  - `deduplicateHeaders` trimmt (Zeile 184), Werte werden in `parseFile` getrimmt (Zeile 271)
+
+### EC-3: Fehlende Spaltenkopfe
+- [ ] **BUG-4:** Kein Hinweis "Erste Zeile wird als Header interpretiert - stimmt das?"
+  - Papa Parse mit `header: true` nimmt die erste Zeile immer als Header. Es gibt keinen Check, ob die erste Zeile tatsaechlich Spaltenkopfe enthaelt, und keinen Bestaetigungsdialog.
+
+### EC-4: CSV mit nur 1 Zeile (nur Header)
+- [x] Fehlermeldung "Keine Daten zum Importieren gefunden (nur Header-Zeile)."
+  - Zeile 254-256
+
+### EC-5: Pflichtfeld leer in einzelnen Zeilen
+- [x] Zeile wird als ungueltig markiert, restliche Zeilen koennen importiert werden
+  - `validateRow` setzt Fehler, betroffene Zeile bekommt `status: 'invalid'`
+
+### EC-6: Alle Zeilen ungueltig
+- [x] Import-Button ist deaktiviert
+  - `disabled={importableCount === 0}` (Zeile 930)
+- [ ] **BUG-5:** Kein expliziter Hinweis "Keine gueltigen Eintraege zum Importieren"
+  - Der Button ist deaktiviert, aber es fehlt eine textuelle Meldung
+
+### EC-7: Doppelte Spaltenkopfe in CSV
+- [x] Werden als "Spalte A", "Spalte A (2)" etc. angezeigt
+  - `deduplicateHeaders` Funktion (Zeile 181-191)
+
+### EC-8: Sehr lange Feldwerte
+- [ ] **BUG-6:** Keine Begrenzung auf 500 Zeichen, keine Warnung bei langen Werten
+  - Die Validierung (`validateRow`) prueft nicht auf Feldlaenge. Die Spec fordert max. 500 Zeichen mit Warnung.
+
+### EC-9: Sonderzeichen (Umlaute, Akzente)
+- [x] UTF-8 Encoding in Papa Parse konfiguriert
+
+### EC-10: Windows-Zeilenumbrueche (CRLF)
+- [x] Papa Parse verarbeitet CRLF automatisch
+
+### EC-11: Browser-Reload waehrend Import
+- [x] Warnung via `beforeunload` Event
+  - `useEffect` mit `beforeunload` Handler (Zeile 220-227)
+
+### EC-12: Geocoding-Fehler nach Import
+- [ ] **BUG-3 (siehe oben):** Geocoding ist komplett defekt, da Ergebnisse nie gespeichert werden
+
+### EC-13: Land-Feld nicht gemappt
+- [x] Default-Wert `CH` wird verwendet
+  - `land: r.mappedData.land?.trim() || 'CH'` (Zeile 460)
+
+---
+
+## Security Analysis (Red Team)
+
+### SEC-1: Authentication Checks
+- [x] `/api/stuetzpunkte/check-duplicates` prueft Auth (Zeile 18-21)
+- [x] `/api/stuetzpunkte/import` prueft Auth (Zeile 36-39)
+- [x] Beide Endpunkte verwenden `supabase.auth.getUser()` mit Server-seitigem Cookie-Check
+
+### SEC-2: Input Validation
+- [x] Zod-Schemas validieren Eingaben auf beiden API-Endpunkten
+- [x] `CheckDuplicatesSchema` begrenzt auf max. 1000 Paare
+- [x] `ImportSchema` begrenzt auf max. 1000 Zeilen
+- [x] Import-Daten werden Pflichtfelder-validiert (min(1))
+- [x] Status und Oeffnungszeiten-Typ sind auf erlaubte Enum-Werte beschraenkt
+
+### SEC-3: SQL Injection
+- [x] Supabase Client verwendet parametrisierte Queries, kein rohes SQL
+- [ ] **SEC-BUG-1 (CRITICAL): SQL Injection in bestehender Stuetzpunkte-Suche**
+  - In `src/app/api/stuetzpunkte/route.ts` Zeile 48 wird der `search`-Parameter direkt in einen `.or()` Filter eingebaut: `query = query.or(\`name.ilike.%${search}%,plz.ilike.%${search}%,ort.ilike.%${search}%\`)`
+  - Ein Angreifer kann PostgREST-Filter-Syntax in den `search`-Parameter injizieren (z.B. `%,id.neq.0)--` oder aehnliche PostgREST-Operatoren)
+  - Dies betrifft NICHT das PROJ-14 Feature direkt, sondern die bestehende API, auf die der Import verlinkt
+  - **HINWEIS:** Dies wurde bereits in `features/BUG-1-sql-injection-search.md` dokumentiert
+
+### SEC-4: Rate Limiting
+- [ ] **SEC-BUG-2 (HIGH): Kein Rate Limiting auf Import-API**
+  - Ein authentifizierter Admin kann die Import-API beliebig oft aufrufen
+  - Bei 1000 Zeilen pro Request koennte ein kompromittierter Admin-Account massenhaft Daten einfuegen
+  - Es gibt kein serverseitiges Rate Limiting auf `/api/stuetzpunkte/import`
+
+### SEC-5: Data Exfiltration via Duplicate Check
+- [ ] **SEC-BUG-3 (MEDIUM): Information Disclosure ueber Duplikat-Check**
+  - Die `/api/stuetzpunkte/check-duplicates` API gibt bei Duplikaten die vollstaendige Adresse (id, name, plz, ort, strasse, hausnummer) zurueck
+  - Ein authentifizierter Admin kann durch systematisches Abfragen mit verschiedenen name+plz Kombinationen bestehende Stuetzpunkte enumerieren
+  - Risiko: Niedrig, da Admin-Zugang erforderlich, aber bei Multi-Tenant-Szenarien problematisch
+
+### SEC-6: Missing CSRF Protection
+- [x] Next.js API Routes sind durch SameSite Cookies geschuetzt (Standard-Verhalten)
+
+### SEC-7: Denial of Service
+- [ ] **SEC-BUG-4 (MEDIUM): Keine Payload-Groessenbegrenzung auf API-Ebene**
+  - Die Import-API akzeptiert bis zu 1000 Zeilen. Bei maximal 16+ Feldern pro Zeile und 500+ Zeichen pro Feld koennen extrem grosse Payloads gesendet werden
+  - Zod validiert zwar die Struktur, aber die Datenmenge wird erst nach dem vollstaendigen JSON-Parsing geprueft
+  - Next.js hat ein Standard-Body-Size-Limit (1MB), aber dies sollte explizit konfiguriert werden
+
+### SEC-8: Update Authorization
+- [ ] **SEC-BUG-5 (HIGH): Fehlende Autorisierungspruefung bei Updates**
+  - Die Import-API fuehrt Updates via `existingId` durch (Zeile 115-123 in import/route.ts)
+  - Das `existingId` kommt direkt vom Client und wird zwar als UUID validiert, aber es wird nicht geprueft ob der angemeldete Admin Bearbeitungsrechte auf diesen spezifischen Eintrag hat
+  - Wenn RLS-Policies in Supabase nicht korrekt konfiguriert sind, koennte ein Admin fremde Eintraege ueberschreiben
+  - Aktuell scheint die App Single-Tenant zu sein (ein Admin verwaltet alle), aber bei zukuenftiger Multi-Tenant-Erweiterung waere dies kritisch
+
+---
+
+## Bugs Found
+
+### BUG-1: Update ueberschreibt alle Felder statt nur gemappte
+- **Severity:** High
+- **Location:** `src/app/admin/(dashboard)/stuetzpunkte/import/page.tsx` Zeile 453-483 und `src/app/api/stuetzpunkte/import/route.ts` Zeile 115-123
+- **Steps to Reproduce:**
+  1. CSV importieren mit nur den Spalten name, strasse, hausnummer, plz, ort, telefon
+  2. Ein Duplikat wird erkannt (bestehender Stuetzpunkt mit website="www.example.com")
+  3. Admin waehlt "Ueberschreiben"
+  4. Expected: Nur gemappte Felder werden aktualisiert, website bleibt "www.example.com"
+  5. Actual: website wird auf `null` gesetzt, status wird auf Default "aktiv" ueberschrieben
+- **Root Cause:** `executeImport()` sendet alle Felder mit Default-Werten. Die API macht `update({...row.data})` und ueberschreibt auch nicht-gemappte Felder.
+- **Fix-Vorschlag:** Nur Felder senden, die tatsaechlich gemappt wurden. Das Mapping als Metadata mitsenden, damit die API weiss welche Felder zu updaten sind.
+- **Priority:** High (Data Loss)
+
+### BUG-2: Import ist nicht transaktional
+- **Severity:** High
+- **Location:** `src/app/api/stuetzpunkte/import/route.ts`
+- **Steps to Reproduce:**
+  1. CSV mit 100 Zeilen importieren
+  2. Zeile 50 hat einen Datenbankfehler (z.B. Unique Constraint Violation)
+  3. Expected: Gesamter Import wird zurueckgerollt (alle 100 Zeilen)
+  4. Actual: Zeilen 1-49 sind eingefuegt, Zeile 50 fehlgeschlagen, Zeilen 51-100 werden versucht
+- **Root Cause:** Supabase JavaScript Client bietet kein natives Transaction-API. Die aktuelle Implementierung verwendet Batch Insert mit Single-Row-Fallback.
+- **Fix-Vorschlag:** Supabase RPC mit einer PostgreSQL-Funktion verwenden, die den gesamten Import in einer Transaktion ausfuehrt. Alternativ: Spec anpassen, um "best effort" Import zu beschreiben (teilweiser Import mit Fehlerreport).
+- **Priority:** High (Data Integrity)
+
+### BUG-3: Geocoding nach Import speichert keine Koordinaten
+- **Severity:** Critical
+- **Location:** `src/app/admin/(dashboard)/stuetzpunkte/import/page.tsx` Zeile 539-550
+- **Steps to Reproduce:**
+  1. CSV importieren ohne latitude/longitude Spalten
+  2. Import ist erfolgreich
+  3. Expected: Koordinaten werden asynchron via Geocoding ermittelt und in DB gespeichert
+  4. Actual: `/api/geocode` wird aufgerufen, Response wird komplett ignoriert, keine Koordinaten in DB
+- **Root Cause:** `geocodeImportedRows()` ruft `fetch(/api/geocode?address=...)` auf, aber das Ergebnis wird nicht weiterverwendet. Die Funktion muesste nach erfolgreichem Geocoding ein Update auf den Stuetzpunkt durchfuehren. Ausserdem kennt die Funktion die IDs der neu erstellten Stuetzpunkte nicht, da `importResult` nur Zaehler enthaelt.
+- **Fix-Vorschlag:** Die Import-API sollte die IDs der erstellten Eintraege zurueckgeben. Dann muss `geocodeImportedRows` fuer jede ID einen Update-Aufruf mit den Koordinaten machen, z.B. via `PATCH /api/stuetzpunkte/[id]`.
+- **Priority:** Critical (Kernfunktion defekt - Stuetzpunkte ohne Koordinaten erscheinen nicht auf der Karte)
+
+### BUG-4: Kein Bestaetigungsdialog fuer Header-Erkennung
+- **Severity:** Low
+- **Location:** `src/app/admin/(dashboard)/stuetzpunkte/import/page.tsx` Zeile 244-306
+- **Steps to Reproduce:**
+  1. CSV hochladen, deren erste Zeile Daten enthaelt (keine Spaltenkopfe)
+  2. Expected: Hinweis "Erste Zeile wird als Header interpretiert - stimmt das?"
+  3. Actual: Erste Zeile wird stillschweigend als Header genommen, Daten gehen verloren
+- **Fix-Vorschlag:** Nach dem Parsing pruefen, ob die Header-Werte "typisch" aussehen (z.B. enthalten Zahlen, Sonderzeichen, oder sind sehr lang). Falls verdaechtig, Bestaetigungsdialog anzeigen.
+- **Priority:** Low (Edge Case, UX)
+
+### BUG-5: Fehlender Hinweis wenn alle Zeilen ungueltig
+- **Severity:** Low
+- **Location:** `src/app/admin/(dashboard)/stuetzpunkte/import/page.tsx` Schritt 3
+- **Steps to Reproduce:**
+  1. CSV hochladen mit Daten wo alle Zeilen Validierungsfehler haben
+  2. Expected: Explizite Meldung "Keine gueltigen Eintraege zum Importieren"
+  3. Actual: Import-Button ist deaktiviert, aber kein erklaereder Text warum
+- **Fix-Vorschlag:** Conditional Alert anzeigen wenn `importableCount === 0`: "Keine gueltigen Eintraege zum Importieren. Bitte korrigieren Sie die CSV-Datei."
+- **Priority:** Low (UX)
+
+### BUG-6: Keine Feldlaenge-Begrenzung (max. 500 Zeichen)
+- **Severity:** Medium
+- **Location:** `src/app/admin/(dashboard)/stuetzpunkte/import/page.tsx` `validateRow()` Funktion
+- **Steps to Reproduce:**
+  1. CSV mit einem Name-Feld von 10.000 Zeichen importieren
+  2. Expected: Warnung "Wert zu lang (max. 500 Zeichen)"
+  3. Actual: Wert wird ohne Warnung importiert (nur durch DB-Spaltengroesse begrenzt)
+- **Fix-Vorschlag:** In `validateRow()` Laengenpruefung fuer alle Textfelder hinzufuegen.
+- **Priority:** Medium (Data Quality)
+
+### BUG-7: Fortschrittsbalken zeigt keine echte Progress
+- **Severity:** Low
+- **Location:** `src/app/admin/(dashboard)/stuetzpunkte/import/page.tsx` Zeile 437-536
+- **Steps to Reproduce:**
+  1. Import mit vielen Zeilen starten
+  2. Expected: Fortschrittsbalken zeigt echten Fortschritt
+  3. Actual: Springt von 10% -> 30% -> 70% -> 90% -> 100% in festen Schritten. Es gibt keinen echten Progress-Tracking, da der gesamte Import in einem einzigen API-Call passiert.
+- **Fix-Vorschlag:** Fuer echten Fortschritt muesste der Import in Batches aufgeteilt werden, oder Server-Sent Events / WebSocket fuer Progress-Updates verwenden. Alternativ: Spec anpassen, da bei einem einzigen API-Call kein echter Fortschritt moeglich ist.
+- **Priority:** Low (UX)
+
+---
+
+## Regression Test
+
+### Stuetzpunkte-Uebersichtsseite
+- [x] Bestehende Funktionalitaet (Suche, Sortierung, Pagination, Loeschen) nicht beeintraechtigt
+  - Nur ein Button wurde hinzugefuegt (Zeile 171-176), restlicher Code unveraendert
+- [x] "Neuer Stuetzpunkt" Button weiterhin vorhanden und funktional
+
+### Bestehende APIs
+- [x] GET/POST `/api/stuetzpunkte` nicht veraendert
+- [x] Bestehende CRUD-Operationen nicht betroffen (nur neue Dateien hinzugefuegt)
+
+### Widget
+- [x] Widget-Code nicht veraendert durch PROJ-14
+- [x] Keine Aenderungen an `public/widget/` Dateien
+
+---
+
+## Summary
+
+- 22 Acceptance Criteria geprueft
+- 19 PASSED
+- 3 FAILED (BUG-1, BUG-2, BUG-3)
+- 13 Edge Cases geprueft
+- 9 PASSED
+- 4 FAILED (BUG-3, BUG-4, BUG-5, BUG-6)
+- 7 Bugs gefunden (1 Critical, 2 High, 1 Medium, 3 Low)
+- 5 Security-Findings (1 Critical [vorbekannt], 2 High, 2 Medium)
+- Feature ist **NICHT production-ready** (Critical + High Bugs muessen gefixt werden)
+
+---
+
+## Recommendations
+
+### Must Fix vor Deployment (Critical/High):
+
+1. **BUG-3 (Critical):** Geocoding nach Import reparieren - Koordinaten muessen in DB geschrieben werden. Ohne Fix haben importierte Stuetzpunkte keine Kartenposition.
+2. **BUG-1 (High):** Update-Logik so aendern, dass nur gemappte Felder aktualisiert werden. Bestehende Werte duerfen nicht durch Defaults ueberschrieben werden.
+3. **BUG-2 (High):** Transaktionales Verhalten implementieren (Supabase RPC) oder Spec aktualisieren und klare Kommunikation bei partiellem Import.
+
+### Should Fix (Medium):
+
+4. **BUG-6 (Medium):** Feldlaenge-Validierung (max. 500 Zeichen) einbauen.
+5. **SEC-BUG-2 (High):** Rate Limiting auf Import-API hinzufuegen.
+6. **SEC-BUG-5 (High):** Update-Autorisierung absichern (relevant fuer zukuenftige Multi-Tenant-Szenarien).
+
+### Nice to Have (Low):
+
+7. **BUG-4:** Header-Bestaetigungsdialog
+8. **BUG-5:** Explizite Meldung bei 0 gueltigen Zeilen
+9. **BUG-7:** Realistischerer Fortschrittsbalken

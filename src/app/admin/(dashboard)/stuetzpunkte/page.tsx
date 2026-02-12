@@ -27,6 +27,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LucideIcon } from '@/components/icon-picker'
 import {
+  AlertTriangle,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
@@ -47,6 +48,7 @@ interface StuetzpunktService {
 interface Stuetzpunkt {
   id: string
   name: string
+  hausnummer: string | null
   plz: string
   ort: string
   status: 'aktiv' | 'temporaer_geschlossen'
@@ -61,6 +63,7 @@ export default function StuetzpunktePage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('')
   const [sortBy, setSortBy] = useState('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(1)
@@ -82,6 +85,9 @@ export default function StuetzpunktePage() {
       page: String(page),
       limit: String(limit),
     })
+    if (filter) {
+      params.set('filter', filter)
+    }
 
     const response = await fetch(`/api/stuetzpunkte?${params}`)
     if (response.ok) {
@@ -93,7 +99,7 @@ export default function StuetzpunktePage() {
       setError('Fehler beim Laden der Stützpunkte')
     }
     setIsLoading(false)
-  }, [search, sortBy, sortDir, page])
+  }, [search, filter, sortBy, sortDir, page])
 
   useEffect(() => {
     loadData()
@@ -203,14 +209,28 @@ export default function StuetzpunktePage() {
           <CardDescription>{total} Stützpunkt{total !== 1 ? 'e' : ''} gesamt</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Nach Name, PLZ oder Ort suchen..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-9"
-            />
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Nach Name, PLZ oder Ort suchen..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Button
+              variant={filter === 'incomplete' ? 'default' : 'outline'}
+              size="sm"
+              className="shrink-0"
+              onClick={() => {
+                setFilter((f) => (f === 'incomplete' ? '' : 'incomplete'))
+                setPage(1)
+              }}
+            >
+              <AlertTriangle className="mr-1.5 h-4 w-4" />
+              Unvollständig
+            </Button>
           </div>
 
           {isLoading ? (
@@ -285,11 +305,18 @@ export default function StuetzpunktePage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {sp.latitude ? (
-                          <MapPin className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <MapPin className="h-4 w-4 text-muted-foreground/30" />
-                        )}
+                        <div className="flex items-center gap-1">
+                          {sp.latitude ? (
+                            <MapPin className="h-4 w-4 text-green-600" />
+                          ) : (
+                            <MapPin className="h-4 w-4 text-muted-foreground/30" />
+                          )}
+                          {(!sp.hausnummer || !sp.latitude) && (
+                            <span title="Unvollständig">
+                              <AlertTriangle className="h-3.5 w-3.5 text-orange-500" />
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">

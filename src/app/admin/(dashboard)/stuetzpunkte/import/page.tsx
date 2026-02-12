@@ -49,6 +49,7 @@ interface ImportRow {
   mappedData: Record<string, string>
   status: 'valid' | 'duplicate' | 'invalid'
   errors: string[]
+  warnings: string[]
   duplicateExisting?: {
     id: string
     name: string
@@ -73,9 +74,8 @@ interface ImportResult {
 const TARGET_FIELDS = [
   { value: '_ignore', label: 'Nicht importieren' },
   { value: 'name', label: 'Name', required: true },
-  { value: 'strasse_hausnummer', label: 'Straße + Hausnummer (kombiniert)' },
   { value: 'strasse', label: 'Straße', required: true },
-  { value: 'hausnummer', label: 'Hausnummer', required: true },
+  { value: 'hausnummer', label: 'Hausnummer' },
   { value: 'plz', label: 'PLZ', required: true },
   { value: 'ort', label: 'Ort', required: true },
   { value: 'telefon', label: 'Telefon', required: true },
@@ -108,6 +108,67 @@ function splitStrasseHausnummer(value: string): { strasse: string; hausnummer: s
 const MAX_ROWS = 1000
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
+// --- Auto-split combined address columns ---
+
+function normalizeAddressColumns(
+  headers: string[],
+  rows: Record<string, string>[]
+): { headers: string[]; rows: Record<string, string>[]; splitInfo: string | null } {
+  // Check if a hausnummer column already exists
+  const hasHausnummer = headers.some((h) => {
+    const n = h.trim().toLowerCase().replace(/[^a-zäöü0-9]/g, '')
+    return /^(hausnummer|hausnr|hnr|nr|number)$/.test(n)
+  })
+
+  if (hasHausnummer) {
+    return { headers, rows, splitInfo: null }
+  }
+
+  // Find a column that looks like a combined address
+  const addressPattern = /^(strasse|str|straße|adresse|address|street|strassehausnummer|straßehausnummer|strassenr|straßenr|adressekomplett|fulladdress)$/
+  const addressColIndex = headers.findIndex((h) => {
+    const n = h.trim().toLowerCase().replace(/[^a-zäöü0-9]/g, '')
+    return addressPattern.test(n)
+  })
+
+  if (addressColIndex === -1) {
+    return { headers, rows, splitInfo: null }
+  }
+
+  const addressColName = headers[addressColIndex]
+
+  // Check if values look like combined addresses (street + number)
+  const sampleValues = rows.slice(0, 10).map((r) => r[addressColName] ?? '')
+  const matchCount = sampleValues.filter((v) => /^.+\s+\d\S*$/.test(v.trim())).length
+
+  if (matchCount < Math.min(2, sampleValues.length)) {
+    return { headers, rows, splitInfo: null }
+  }
+
+  // Replace the combined column with two separate columns
+  const newHeaders = [...headers]
+  newHeaders.splice(addressColIndex, 1, 'Straße', 'Hausnummer')
+
+  const newRows = rows.map((row) => {
+    const newRow: Record<string, string> = {}
+    for (const key of headers) {
+      if (key === addressColName) continue
+      newRow[key] = row[key] ?? ''
+    }
+    const combined = row[addressColName] ?? ''
+    const { strasse, hausnummer } = splitStrasseHausnummer(combined)
+    newRow['Straße'] = strasse
+    newRow['Hausnummer'] = hausnummer
+    return newRow
+  })
+
+  return {
+    headers: newHeaders,
+    rows: newRows,
+    splitInfo: `Spalte «${addressColName}» wurde automatisch in Straße und Hausnummer aufgetrennt.`,
+  }
+}
+
 // --- Auto-mapping heuristics ---
 
 function guessTargetField(csvHeader: string, alreadyMapped: Set<string>): string {
@@ -115,7 +176,6 @@ function guessTargetField(csvHeader: string, alreadyMapped: Set<string>): string
 
   const heuristics: Array<[RegExp, string]> = [
     [/^(name|firmenname|firma|bezeichnung|standort)$/, 'name'],
-    [/^(strassehausnummer|straßehausnummer|strassenr|straßenr|adressekomplett|fulladdress)$/, 'strasse_hausnummer'],
     [/^(strasse|str|straße|adresse|address|street)$/, 'strasse'],
     [/^(hausnummer|hausnr|hnr|nr|number)$/, 'hausnummer'],
     [/^(plz|postleitzahl|zip|zipcode|postal)$/, 'plz'],
@@ -145,14 +205,20 @@ function guessTargetField(csvHeader: string, alreadyMapped: Set<string>): string
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function validateRow(mappedData: Record<string, string>): string[] {
+function validateRow(mappedData: Record<string, string>): { errors: string[]; warnings: string[] } {
   const errors: string[] = []
+  const warnings: string[] = []
 
   for (const field of REQUIRED_FIELDS) {
     if (!mappedData[field]?.trim()) {
       const label = TARGET_FIELDS.find((f) => f.value === field)?.label ?? field
       errors.push(`${label} fehlt`)
     }
+  }
+
+  // Hausnummer is a soft warning - entries can be imported and fixed later
+  if (!mappedData.hausnummer?.trim()) {
+    warnings.push('Hausnummer fehlt – bitte nach Import ergänzen')
   }
 
   if (mappedData.status && mappedData.status.trim() !== '') {
@@ -187,7 +253,7 @@ function validateRow(mappedData: Record<string, string>): string[] {
     }
   }
 
-  return errors
+  return { errors, warnings }
 }
 
 // --- Deduplicate CSV headers ---
@@ -215,6 +281,7 @@ export default function CsvImportPage() {
   const [fileName, setFileName] = useState('')
   const [fileError, setFileError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [splitInfo, setSplitInfo] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   // Step 2: Field Mapping
@@ -275,14 +342,14 @@ export default function CsvImportPage() {
           return
         }
 
-        const headers = deduplicateHeaders(results.meta.fields)
+        const rawHeaders = deduplicateHeaders(results.meta.fields)
         const rows = results.data as Record<string, string>[]
 
         // Re-map rows to deduplicated headers
         const remappedRows = rows.map((row) => {
           const newRow: Record<string, string> = {}
           results.meta.fields!.forEach((originalHeader, i) => {
-            newRow[headers[i]] = (row[originalHeader] ?? '').trim()
+            newRow[rawHeaders[i]] = (row[originalHeader] ?? '').trim()
           })
           return newRow
         })
@@ -297,8 +364,12 @@ export default function CsvImportPage() {
           return
         }
 
+        // Auto-split combined address columns (e.g. "Musterweg 2" → Straße + Hausnummer)
+        const { headers, rows: normalizedRows, splitInfo: info } = normalizeAddressColumns(rawHeaders, nonEmptyRows)
+
         setCsvHeaders(headers)
-        setCsvRows(nonEmptyRows)
+        setCsvRows(normalizedRows)
+        setSplitInfo(info)
         setFileName(file.name)
 
         // Auto-map columns
@@ -345,13 +416,7 @@ export default function CsvImportPage() {
     mappings.filter((m) => m.targetField !== '_ignore').map((m) => m.targetField)
   )
 
-  // If strasse_hausnummer is mapped, it satisfies both strasse and hausnummer
-  const effectiveTargets = new Set(assignedTargets)
-  if (effectiveTargets.has('strasse_hausnummer')) {
-    effectiveTargets.add('strasse')
-    effectiveTargets.add('hausnummer')
-  }
-  const missingRequired = REQUIRED_FIELDS.filter((f) => !effectiveTargets.has(f))
+  const missingRequired = REQUIRED_FIELDS.filter((f) => !assignedTargets.has(f))
   const allRequiredMapped = missingRequired.length === 0
 
   const getPreviewValues = (csvColumn: string): string[] => {
@@ -371,18 +436,10 @@ export default function CsvImportPage() {
       const mappedData: Record<string, string> = {}
       for (const mapping of mappings) {
         if (mapping.targetField === '_ignore') continue
-        if (mapping.targetField === 'strasse_hausnummer') {
-          // Split combined field into strasse + hausnummer
-          const combined = rawRow[mapping.csvColumn] ?? ''
-          const { strasse, hausnummer } = splitStrasseHausnummer(combined)
-          mappedData.strasse = strasse
-          mappedData.hausnummer = hausnummer
-        } else {
-          mappedData[mapping.targetField] = rawRow[mapping.csvColumn] ?? ''
-        }
+        mappedData[mapping.targetField] = rawRow[mapping.csvColumn] ?? ''
       }
 
-      const errors = validateRow(mappedData)
+      const { errors, warnings } = validateRow(mappedData)
 
       return {
         rowNum: i + 1,
@@ -390,6 +447,7 @@ export default function CsvImportPage() {
         mappedData,
         status: errors.length > 0 ? 'invalid' : 'valid',
         errors,
+        warnings,
         duplicateAction: 'skip' as const,
       }
     })
@@ -436,6 +494,7 @@ export default function CsvImportPage() {
   }
 
   const validCount = importRows.filter((r) => r.status === 'valid').length
+  const warningCount = importRows.filter((r) => r.status !== 'invalid' && r.warnings.length > 0).length
   const duplicateCount = importRows.filter((r) => r.status === 'duplicate').length
   const invalidCount = importRows.filter((r) => r.status === 'invalid').length
 
@@ -481,11 +540,7 @@ export default function CsvImportPage() {
     const mappedFieldNames = new Set(
       mappings
         .filter((m) => m.targetField !== '_ignore')
-        .flatMap((m) =>
-          m.targetField === 'strasse_hausnummer'
-            ? ['strasse', 'hausnummer']
-            : [m.targetField]
-        )
+        .map((m) => m.targetField)
     )
 
     const apiRows = rowsToImport.map((r) => {
@@ -732,6 +787,16 @@ export default function CsvImportPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Info about auto-split address column */}
+            {splitInfo && (
+              <Alert>
+                <AlertDescription className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-blue-600 shrink-0" />
+                  {splitInfo}
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Required fields status */}
             <div className="rounded-md bg-muted p-3 text-sm">
               {allRequiredMapped ? (
@@ -853,6 +918,12 @@ export default function CsvImportPage() {
                     <CheckCircle2 className="mr-1 h-3 w-3" />
                     {validCount} gültig
                   </Badge>
+                  {warningCount > 0 && (
+                    <Badge variant="default" className="bg-orange-500">
+                      <AlertTriangle className="mr-1 h-3 w-3" />
+                      {warningCount} unvollständig
+                    </Badge>
+                  )}
                   <Badge variant="default" className="bg-amber-500">
                     <AlertTriangle className="mr-1 h-3 w-3" />
                     {duplicateCount} Duplikat{duplicateCount !== 1 ? 'e' : ''}
@@ -960,6 +1031,11 @@ export default function CsvImportPage() {
                             {row.status === 'duplicate' && row.duplicateExisting && (
                               <span className="text-xs text-amber-700">
                                 Duplikat: {row.duplicateExisting.name}, {row.duplicateExisting.ort}
+                              </span>
+                            )}
+                            {row.status !== 'invalid' && row.warnings.length > 0 && (
+                              <span className="text-xs text-orange-600">
+                                {row.warnings.join('; ')}
                               </span>
                             )}
                           </TableCell>
@@ -1074,6 +1150,7 @@ export default function CsvImportPage() {
                   setFileName('')
                   setFileError(null)
                   setMappings([])
+                  setSplitInfo(null)
                   setImportRows([])
                   setImportResult(null)
                   setImportError(null)
