@@ -73,6 +73,7 @@ interface ImportResult {
 const TARGET_FIELDS = [
   { value: '_ignore', label: 'Nicht importieren' },
   { value: 'name', label: 'Name', required: true },
+  { value: 'strasse_hausnummer', label: 'Straße + Hausnummer (kombiniert)' },
   { value: 'strasse', label: 'Straße', required: true },
   { value: 'hausnummer', label: 'Hausnummer', required: true },
   { value: 'plz', label: 'PLZ', required: true },
@@ -92,6 +93,18 @@ const TARGET_FIELDS = [
 
 const REQUIRED_FIELDS = TARGET_FIELDS.filter((f) => 'required' in f && f.required).map((f) => f.value)
 
+// Split "Bahnhofstrasse 42" → { strasse: "Bahnhofstrasse", hausnummer: "42" }
+function splitStrasseHausnummer(value: string): { strasse: string; hausnummer: string } {
+  const trimmed = value.trim()
+  // Match last segment that starts with a digit (e.g., "42", "5a", "10-12")
+  const match = trimmed.match(/^(.+?)\s+(\d\S*)$/)
+  if (match) {
+    return { strasse: match[1].trim(), hausnummer: match[2].trim() }
+  }
+  // No house number found - return whole value as strasse
+  return { strasse: trimmed, hausnummer: '' }
+}
+
 const MAX_ROWS = 1000
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
@@ -102,6 +115,7 @@ function guessTargetField(csvHeader: string, alreadyMapped: Set<string>): string
 
   const heuristics: Array<[RegExp, string]> = [
     [/^(name|firmenname|firma|bezeichnung|standort)$/, 'name'],
+    [/^(strassehausnummer|straßehausnummer|strassenr|straßenr|adressekomplett|fulladdress)$/, 'strasse_hausnummer'],
     [/^(strasse|str|straße|adresse|address|street)$/, 'strasse'],
     [/^(hausnummer|hausnr|hnr|nr|number)$/, 'hausnummer'],
     [/^(plz|postleitzahl|zip|zipcode|postal)$/, 'plz'],
@@ -331,7 +345,13 @@ export default function CsvImportPage() {
     mappings.filter((m) => m.targetField !== '_ignore').map((m) => m.targetField)
   )
 
-  const missingRequired = REQUIRED_FIELDS.filter((f) => !assignedTargets.has(f))
+  // If strasse_hausnummer is mapped, it satisfies both strasse and hausnummer
+  const effectiveTargets = new Set(assignedTargets)
+  if (effectiveTargets.has('strasse_hausnummer')) {
+    effectiveTargets.add('strasse')
+    effectiveTargets.add('hausnummer')
+  }
+  const missingRequired = REQUIRED_FIELDS.filter((f) => !effectiveTargets.has(f))
   const allRequiredMapped = missingRequired.length === 0
 
   const getPreviewValues = (csvColumn: string): string[] => {
@@ -350,7 +370,14 @@ export default function CsvImportPage() {
     const rows: ImportRow[] = csvRows.map((rawRow, i) => {
       const mappedData: Record<string, string> = {}
       for (const mapping of mappings) {
-        if (mapping.targetField !== '_ignore') {
+        if (mapping.targetField === '_ignore') continue
+        if (mapping.targetField === 'strasse_hausnummer') {
+          // Split combined field into strasse + hausnummer
+          const combined = rawRow[mapping.csvColumn] ?? ''
+          const { strasse, hausnummer } = splitStrasseHausnummer(combined)
+          mappedData.strasse = strasse
+          mappedData.hausnummer = hausnummer
+        } else {
           mappedData[mapping.targetField] = rawRow[mapping.csvColumn] ?? ''
         }
       }
@@ -454,7 +481,11 @@ export default function CsvImportPage() {
     const mappedFieldNames = new Set(
       mappings
         .filter((m) => m.targetField !== '_ignore')
-        .map((m) => m.targetField)
+        .flatMap((m) =>
+          m.targetField === 'strasse_hausnummer'
+            ? ['strasse', 'hausnummer']
+            : [m.targetField]
+        )
     )
 
     const apiRows = rowsToImport.map((r) => {
