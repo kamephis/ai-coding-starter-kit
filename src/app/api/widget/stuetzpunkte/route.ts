@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
+import { sanitizeSearch } from '@/lib/search-utils'
 
 const SUPPORTED_LANGS = ['de', 'fr', 'it']
 
@@ -32,9 +33,12 @@ export async function GET(request: Request) {
       )
     `, { count: 'exact' })
 
-  // Textsuche
+  // Textsuche (5 Felder, sanitisiert gegen PostgREST-Filter-Manipulation)
   if (search) {
-    query = query.or(`name.ilike.%${search}%,plz.ilike.%${search}%,ort.ilike.%${search}%`)
+    const s = sanitizeSearch(search)
+    if (s) {
+      query = query.or(`name.ilike.%${s}%,plz.ilike.%${s}%,ort.ilike.%${s}%,strasse.ilike.%${s}%,hausnummer.ilike.%${s}%`)
+    }
   }
 
   // Nur Stützpunkte mit Koordinaten (für Kartenanzeige)

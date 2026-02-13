@@ -108,34 +108,64 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
     loadData()
   }, [lang, apiBase, configLoaded])
 
-  // Filter logic
+  // Filter logic: text matches ∪ radius matches (union, not intersection)
   const filteredStuetzpunkte = useMemo(() => {
-    let results = stuetzpunkte
+    let base = stuetzpunkte
 
-    // Text search
-    if (searchText.length >= 3) {
-      const q = searchText.toLowerCase()
-      results = results.filter(
-        (sp) =>
-          sp.name.toLowerCase().includes(q) ||
-          sp.plz.toLowerCase().includes(q) ||
-          sp.ort.toLowerCase().includes(q)
-      )
-    }
-
-    // Service filters (AND)
+    // Service filters (AND) - applied first to both text and radius results
     if (activeServiceFilters.length > 0) {
-      results = results.filter((sp) => {
+      base = base.filter((sp) => {
         const spServiceIds = sp.stuetzpunkt_services?.map((ss) => ss.service_typ_id) || []
         return activeServiceFilters.every((fid) => spServiceIds.includes(fid))
       })
     }
 
+    // Text search across 5 fields
+    const textMatchIds = new Set<string>()
+    if (searchText.length >= 3) {
+      const q = searchText.toLowerCase()
+      for (const sp of base) {
+        if (
+          sp.name.toLowerCase().includes(q) ||
+          sp.plz.toLowerCase().includes(q) ||
+          sp.ort.toLowerCase().includes(q) ||
+          (sp.strasse && sp.strasse.toLowerCase().includes(q)) ||
+          (sp.hausnummer && sp.hausnummer.toLowerCase().includes(q))
+        ) {
+          textMatchIds.add(sp.id)
+        }
+      }
+    }
+
     // Radius filter
+    const radiusMatchIds = new Set<string>()
     if (userLocation && selectedRadius > 0) {
-      results = results.filter(
-        (sp) => haversineDistance(userLocation.lat, userLocation.lng, sp.latitude, sp.longitude) <= selectedRadius
-      )
+      for (const sp of base) {
+        if (haversineDistance(userLocation.lat, userLocation.lng, sp.latitude, sp.longitude) <= selectedRadius) {
+          radiusMatchIds.add(sp.id)
+        }
+      }
+    }
+
+    // Union: text matches OR radius matches
+    let results: Stuetzpunkt[]
+    const hasTextSearch = searchText.length >= 3
+    const hasRadius = userLocation && selectedRadius > 0
+
+    if (hasTextSearch && hasRadius) {
+      // Union of text + radius matches
+      const unionIds = new Set([...textMatchIds, ...radiusMatchIds])
+      results = base.filter((sp) => unionIds.has(sp.id))
+    } else if (hasTextSearch) {
+      results = base.filter((sp) => textMatchIds.has(sp.id))
+    } else if (hasRadius) {
+      results = base.filter((sp) => radiusMatchIds.has(sp.id))
+    } else {
+      results = base
+    }
+
+    // Sort by distance when user location is available
+    if (userLocation && selectedRadius > 0) {
       results.sort((a, b) =>
         haversineDistance(userLocation.lat, userLocation.lng, a.latitude, a.longitude) -
         haversineDistance(userLocation.lat, userLocation.lng, b.latitude, b.longitude)
@@ -151,6 +181,9 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
     )
   }
 
+  // Track whether userLocation was set by geocoding (vs. browser geolocation)
+  const geocodedLocationRef = useRef(false)
+
   const handleGeocode = useCallback(async (text: string) => {
     if (text.length < 3) return
     try {
@@ -161,26 +194,64 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
       if (res.ok) {
         const results = await res.json()
         if (results.length > 0) {
+          geocodedLocationRef.current = true
           setUserLocation({
             lat: parseFloat(results[0].lat),
             lng: parseFloat(results[0].lon),
           })
+        } else {
+          // Geocoding failed: clear geocoded location so radius filter doesn't persist
+          if (geocodedLocationRef.current) {
+            geocodedLocationRef.current = false
+            setUserLocation(null)
+          }
         }
       }
-    } catch { /* ignore geocoding errors */ }
+    } catch {
+      // Geocoding error: clear geocoded location
+      if (geocodedLocationRef.current) {
+        geocodedLocationRef.current = false
+        setUserLocation(null)
+      }
+    }
   }, [])
 
-  // Geocode when search text looks like a PLZ or town
+  // Determine if search text should trigger geocoding
+  // Patterns: pure PLZ (4-5 digits), pure town name (letters only 3+),
+  // PLZ+Ort ("3012 Bern"), address with comma ("Industriestrasse 5, Bern"),
+  // mixed digits+letters ("3012 Bern", "79576 Weil am Rhein")
+  const shouldGeocode = useCallback((text: string): boolean => {
+    const trimmed = text.trim()
+    if (trimmed.length < 3) return false
+    // Pure PLZ (4-5 digits)
+    if (/^\d{4,5}$/.test(trimmed)) return true
+    // Pure town name (letters, spaces, hyphens, umlauts/accents)
+    if (/^[a-zA-ZäöüÄÖÜéèêàâîôùûçñß\s-]{3,}$/.test(trimmed)) return true
+    // Contains comma → address ("Strasse Nr, Ort")
+    if (trimmed.includes(',')) return true
+    // Mixed digits + letters → PLZ+Ort ("3012 Bern", "79576 Weil am Rhein")
+    if (/\d/.test(trimmed) && /[a-zA-ZäöüÄÖÜéèêàâîôùûçñß]/.test(trimmed) && trimmed.includes(' ')) return true
+    return false
+  }, [])
+
+  // Geocode when search text matches geocodable patterns
   useEffect(() => {
-    if (searchText.length >= 3) {
-      const isPlzOrOrt = /^\d{4,5}$/.test(searchText) || /^[a-zA-ZäöüÄÖÜéèêàâîôùûçñß\s]{3,}$/.test(searchText)
-      if (isPlzOrOrt) {
-        handleGeocode(searchText)
+    if (searchText.length >= 3 && shouldGeocode(searchText)) {
+      handleGeocode(searchText)
+    } else if (searchText.length < 3) {
+      // Clear geocoded location when search is cleared
+      if (geocodedLocationRef.current) {
+        geocodedLocationRef.current = false
+        setUserLocation(null)
       }
     } else {
-      setUserLocation(null)
+      // Non-geocodable search (e.g. pure company name): clear geocoded location
+      if (geocodedLocationRef.current) {
+        geocodedLocationRef.current = false
+        setUserLocation(null)
+      }
     }
-  }, [searchText, handleGeocode])
+  }, [searchText, handleGeocode, shouldGeocode])
 
   const handleUserGeolocation = (lat: number, lng: number) => {
     setUserLocation({ lat, lng })

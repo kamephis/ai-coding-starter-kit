@@ -1,5 +1,5 @@
 export const fr = {
-  'search.placeholder': 'Entrez NPA ou lieu',
+  'search.placeholder': 'Rechercher par nom, adresse, NPA ou localité',
   'search.button': 'Rechercher',
   'filter.services': 'Filtrer les services',
   'filter.reset': 'Réinitialiser les filtres',

@@ -1,5 +1,5 @@
 export const de = {
-  'search.placeholder': 'PLZ oder Ort eingeben',
+  'search.placeholder': 'Suche nach Name, Adresse, PLZ oder Ort',
   'search.button': 'Suchen',
   'filter.services': 'Services filtern',
   'filter.reset': 'Filter zurücksetzen',

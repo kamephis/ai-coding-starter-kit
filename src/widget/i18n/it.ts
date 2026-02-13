@@ -1,5 +1,5 @@
 export const it = {
-  'search.placeholder': 'Inserire CAP o luogo',
+  'search.placeholder': 'Cerca per nome, indirizzo, CAP o località',
   'search.button': 'Cerca',
   'filter.services': 'Filtra servizi',
   'filter.reset': 'Reimposta filtri',

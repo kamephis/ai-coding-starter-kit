@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { sanitizeSearch } from '@/lib/search-utils'
 
 const CreateStuetzpunktSchema = z.object({
   name: z.string().min(1, 'Name ist erforderlich').max(200),
@@ -45,8 +46,12 @@ export async function GET(request: Request) {
     .from('stuetzpunkte')
     .select('*, stuetzpunkt_services(service_typ_id, service_typen(id, name, icon))', { count: 'exact' })
 
+  // Textsuche (5 Felder, sanitisiert gegen PostgREST-Filter-Manipulation)
   if (search) {
-    query = query.or(`name.ilike.%${search}%,plz.ilike.%${search}%,ort.ilike.%${search}%`)
+    const s = sanitizeSearch(search)
+    if (s) {
+      query = query.or(`name.ilike.%${s}%,plz.ilike.%${s}%,ort.ilike.%${s}%,strasse.ilike.%${s}%,hausnummer.ilike.%${s}%`)
+    }
   }
 
   // Filter for incomplete entries (missing hausnummer or coordinates)
