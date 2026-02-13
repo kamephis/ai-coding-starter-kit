@@ -27,9 +27,11 @@ function haversineDistance(
 
 interface AppProps {
   apiBase: string
+  initialLang?: Language | null
+  hideLangSwitcher?: boolean
 }
 
-export function App({ apiBase }: AppProps) {
+export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
   const [config, setConfig] = useState<WidgetConfig | null>(null)
   const [services, setServices] = useState<ServiceTyp[]>([])
   const [stuetzpunkte, setStuetzpunkte] = useState<Stuetzpunkt[]>([])
@@ -70,14 +72,14 @@ export function App({ apiBase }: AppProps) {
         const data = await res.json()
         setConfig(data.config)
         setSelectedRadius(data.config.default_radius_km || 0)
-        setLangState(detectLanguage(data.config.default_language))
+        setLangState(detectLanguage(data.config.default_language, initialLang))
       } catch (err) {
         console.error('[Heizmann Storefinder] Failed to load config:', err)
       }
       setConfigLoaded(true)
     }
     loadConfig()
-  }, [apiBase])
+  }, [apiBase, initialLang])
 
   // Step 2: Load translated data whenever lang changes (after config is loaded)
   useEffect(() => {
@@ -359,9 +361,11 @@ export function App({ apiBase }: AppProps) {
     <I18nContext.Provider value={i18nValue}>
       <div className="hsf-root" style={{ '--hsf-primary': primaryColor } as React.CSSProperties}>
         {/* Header */}
-        <div className="hsf-header">
-          <LanguageSwitcher primaryColor={primaryColor} />
-        </div>
+        {!hideLangSwitcher && (
+          <div className="hsf-header">
+            <LanguageSwitcher primaryColor={primaryColor} />
+          </div>
+        )}
 
         {/* Search + Filters */}
         <div className="hsf-toolbar">

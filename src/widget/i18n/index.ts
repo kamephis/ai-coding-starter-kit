@@ -10,18 +10,28 @@ const translations: Record<Language, Record<string, string>> = { de, fr, it }
 
 const STORAGE_KEY = 'heizmann-storefinder-lang'
 
-export function detectLanguage(defaultLang: Language = 'de'): Language {
-  // 1. localStorage
+export function parseDataLang(raw: string | null | undefined): Language | null {
+  if (!raw) return null
+  const normalized = raw.trim().toLowerCase().slice(0, 2)
+  if (normalized && normalized in translations) return normalized as Language
+  return null
+}
+
+export function detectLanguage(defaultLang: Language = 'de', initialLang?: Language | null): Language {
+  // 1. data-lang attribute (highest priority)
+  if (initialLang) return initialLang
+
+  // 2. localStorage
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored && stored in translations) return stored as Language
   } catch { /* localStorage unavailable */ }
 
-  // 2. Browser language
+  // 3. Browser language
   const browserLang = navigator.language?.slice(0, 2)
   if (browserLang && browserLang in translations) return browserLang as Language
 
-  // 3. Default from config
+  // 4. Default from config
   return defaultLang
 }
 

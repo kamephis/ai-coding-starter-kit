@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Check, ClipboardCopy, Loader2, Save, Settings } from 'lucide-react'
 
 interface WidgetConfig {
@@ -39,6 +40,8 @@ export default function EinstellungenPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [snippetLang, setSnippetLang] = useState<string>('')
+  const [snippetHideSwitcher, setSnippetHideSwitcher] = useState(false)
 
   const loadConfig = useCallback(async () => {
     setIsLoading(true)
@@ -98,8 +101,14 @@ export default function EinstellungenPage() {
     }
   }, [success])
 
+  const snippetAttrs = [
+    'id="heizmann-storefinder"',
+    ...(snippetLang ? [`data-lang="${snippetLang}"`] : []),
+    ...(snippetHideSwitcher ? ['data-hide-lang-switcher="true"'] : []),
+  ].join(' ')
+
   const snippetCode = `<!-- Heizmann Storefinder Widget -->
-<div id="heizmann-storefinder"></div>
+<div ${snippetAttrs}></div>
 <script src="${typeof window !== 'undefined' ? window.location.origin : ''}/widget/storefinder.js"></script>`
 
   const handleCopy = async () => {
@@ -251,6 +260,9 @@ export default function EinstellungenPage() {
                     <SelectItem value="it">Italiano</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  Fallback-Sprache, wenn keine Browser- oder Embed-Sprache erkannt wird. Wird durch <code>data-lang</code> im Embed-Code überschrieben.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label>Standard-Suchradius</Label>
@@ -320,6 +332,47 @@ export default function EinstellungenPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Initiale Sprache (optional)</Label>
+              <Select
+                value={snippetLang || '_none'}
+                onValueChange={(v) => setSnippetLang(v === '_none' ? '' : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Keine (automatische Erkennung)</SelectItem>
+                  <SelectItem value="de">Deutsch</SelectItem>
+                  <SelectItem value="fr">Français</SelectItem>
+                  <SelectItem value="it">Italiano</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Setzt die Sprache per <code>data-lang</code> Attribut. Überschreibt Browser- und localStorage-Erkennung.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Sprachwechsel-Button</Label>
+              <div className="flex items-center space-x-2 pt-2">
+                <Checkbox
+                  id="hide-lang-switcher"
+                  checked={snippetHideSwitcher}
+                  onCheckedChange={(checked) => setSnippetHideSwitcher(checked === true)}
+                />
+                <Label htmlFor="hide-lang-switcher" className="font-normal">
+                  Sprachwechsel-Button ausblenden
+                </Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Blendet den DE/FR/IT-Umschalter im Widget aus. Sinnvoll wenn die Sprache durch die CMS-Seite vorgegeben ist.
+              </p>
+            </div>
+          </div>
+
+          <Separator />
+
           <div className="relative">
             <pre className="overflow-x-auto rounded-lg bg-muted p-4 text-sm">
               <code>{snippetCode}</code>

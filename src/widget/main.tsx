@@ -1,6 +1,7 @@
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
+import { parseDataLang } from './i18n'
 import './styles.css'
 
 // Auto-detect script base URL for API and CSS loading
@@ -52,10 +53,14 @@ function init() {
   injectStyles(scriptBase)
 
   const apiBase = getApiBase()
+  const initialLang = parseDataLang(container.getAttribute('data-lang'))
+  const hideLangSwitcher = container.hasAttribute('data-hide-lang-switcher') &&
+    container.getAttribute('data-hide-lang-switcher') !== 'false'
+
   const root = createRoot(container)
   root.render(
     <React.StrictMode>
-      <App apiBase={apiBase} />
+      <App apiBase={apiBase} initialLang={initialLang} hideLangSwitcher={hideLangSwitcher} />
     </React.StrictMode>
   )
 }
