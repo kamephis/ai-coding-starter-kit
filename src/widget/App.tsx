@@ -405,6 +405,14 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
     el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }, [])
 
+  const handleSelectSuggestion = useCallback((id: string) => {
+    setSelectedStuetzpunkt(id)
+    setTimeout(() => {
+      const el = document.getElementById(`hsf-card-${id}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }, 100)
+  }, [])
+
   const handleCardClick = (id: string) => {
     setSelectedStuetzpunkt(id)
   }
@@ -441,7 +449,15 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
         {/* Search + Filters */}
         <div className="hsf-toolbar">
           <div className="hsf-toolbar-row">
-            <SearchBar value={searchText} onChange={setSearchText} primaryColor={primaryColor} />
+            <SearchBar
+              value={searchText}
+              onChange={setSearchText}
+              primaryColor={primaryColor}
+              stuetzpunkte={stuetzpunkte}
+              activeServiceFilters={activeServiceFilters}
+              userLocation={userLocation}
+              onSelectStuetzpunkt={handleSelectSuggestion}
+            />
             <GeolocationButton onLocation={handleUserGeolocation} />
             <RouteButton isLoading={routeLoading} isActive={routeActive} onClick={handleRouteClick} />
             <RadiusSelector value={selectedRadius} onChange={setSelectedRadius} />
