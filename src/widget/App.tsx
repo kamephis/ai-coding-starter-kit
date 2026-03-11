@@ -5,25 +5,13 @@ import { LeafletMap } from './components/LeafletMap'
 import { SearchBar } from './components/SearchBar'
 import { ServiceFilterBar } from './components/ServiceFilterBar'
 import { RadiusSelector } from './components/RadiusSelector'
+import { SortSelector, type SortOption } from './components/SortSelector'
 import { GeolocationButton } from './components/GeolocationButton'
 import { LocationCard } from './components/LocationCard'
 import { LanguageSwitcher } from './components/LanguageSwitcher'
 import { RouteButton } from './components/RouteButton'
 import { RoutePanel } from './components/RoutePanel'
-
-function haversineDistance(
-  lat1: number, lon1: number,
-  lat2: number, lon2: number
-): number {
-  const R = 6371
-  const dLat = ((lat2 - lat1) * Math.PI) / 180
-  const dLon = ((lon2 - lon1) * Math.PI) / 180
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2)
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-}
+import { haversineDistance } from './utils/haversine'
 
 interface AppProps {
   apiBase: string
@@ -42,6 +30,7 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
   const [activeServiceFilters, setActiveServiceFilters] = useState<string[]>([])
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedRadius, setSelectedRadius] = useState(0)
+  const [sortBy, setSortBy] = useState<SortOption>('plz')
   const [selectedStuetzpunkt, setSelectedStuetzpunkt] = useState<string | null>(null)
   const [hoveredStuetzpunkt, setHoveredStuetzpunkt] = useState<string | null>(null)
   const [visibleCount, setVisibleCount] = useState(20)
@@ -164,16 +153,44 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
       results = base
     }
 
-    // Sort by distance when user location is available
-    if (userLocation && selectedRadius > 0) {
-      results.sort((a, b) =>
-        haversineDistance(userLocation.lat, userLocation.lng, a.latitude, a.longitude) -
-        haversineDistance(userLocation.lat, userLocation.lng, b.latitude, b.longitude)
-      )
+    // Sort results based on selected sort option
+    results = results.slice() // avoid mutating original
+    switch (sortBy) {
+      case 'distance':
+        if (userLocation) {
+          results.sort((a, b) => {
+            const da = haversineDistance(userLocation.lat, userLocation.lng, a.latitude, a.longitude)
+            const db = haversineDistance(userLocation.lat, userLocation.lng, b.latitude, b.longitude)
+            // Secondary sort by name when distances round to same 0.1 km
+            if (Math.round(da * 10) === Math.round(db * 10)) {
+              return a.name.localeCompare(b.name)
+            }
+            return da - db
+          })
+        }
+        break
+      case 'nameAZ':
+        results.sort((a, b) => a.name.localeCompare(b.name))
+        break
+      case 'nameZA':
+        results.sort((a, b) => b.name.localeCompare(a.name))
+        break
+      case 'plz':
+        results.sort((a, b) => {
+          const cmp = a.plz.localeCompare(b.plz)
+          return cmp !== 0 ? cmp : a.name.localeCompare(b.name)
+        })
+        break
+      case 'cityAZ':
+        results.sort((a, b) => {
+          const cmp = a.ort.localeCompare(b.ort)
+          return cmp !== 0 ? cmp : a.name.localeCompare(b.name)
+        })
+        break
     }
 
     return results
-  }, [stuetzpunkte, searchText, activeServiceFilters, userLocation, selectedRadius])
+  }, [stuetzpunkte, searchText, activeServiceFilters, userLocation, selectedRadius, sortBy])
 
   const toggleServiceFilter = (id: string) => {
     setActiveServiceFilters((prev) =>
@@ -256,7 +273,15 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
   const handleUserGeolocation = (lat: number, lng: number) => {
     setUserLocation({ lat, lng })
     if (selectedRadius === 0) setSelectedRadius(config?.default_radius_km || 50)
+    setSortBy('distance') // Auto-switch to distance sorting on geolocation
   }
+
+  // Fallback: if distance sort is active but userLocation is lost, revert to PLZ
+  useEffect(() => {
+    if (sortBy === 'distance' && !userLocation) {
+      setSortBy('plz')
+    }
+  }, [userLocation, sortBy])
 
   // Route: find nearest active stuetzpunkt (fallback when none selected)
   const findNearestActive = useCallback((lat: number, lng: number): Stuetzpunkt | null => {
@@ -461,6 +486,7 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
             <GeolocationButton onLocation={handleUserGeolocation} />
             <RouteButton isLoading={routeLoading} isActive={routeActive} onClick={handleRouteClick} />
             <RadiusSelector value={selectedRadius} onChange={setSelectedRadius} />
+            <SortSelector value={sortBy} onChange={setSortBy} distanceAvailable={!!userLocation} disabled={resultCount === 0} />
           </div>
           <ServiceFilterBar
             services={services}
@@ -545,6 +571,9 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
                       stuetzpunkt={sp}
                       primaryColor={primaryColor}
                       isSelected={sp.id === selectedStuetzpunkt}
+                      distance={sortBy === 'distance' && userLocation
+                        ? haversineDistance(userLocation.lat, userLocation.lng, sp.latitude, sp.longitude)
+                        : null}
                       onClick={() => handleCardClick(sp.id)}
                       onMouseEnter={() => setHoveredStuetzpunkt(sp.id)}
                       onMouseLeave={() => setHoveredStuetzpunkt(null)}

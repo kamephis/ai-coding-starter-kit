@@ -31,4 +31,12 @@ export const fr = {
   'route.nearest': 'Point de service le plus proche: {name}',
   'route.target': 'Itinéraire vers: {name}',
   'route.calculating': 'Calcul de l\'itinéraire...',
+  'sort.label': 'Tri',
+  'sort.distance': 'Distance',
+  'sort.nameAZ': 'Nom A–Z',
+  'sort.nameZA': 'Nom Z–A',
+  'sort.plz': 'NPA croissant',
+  'sort.cityAZ': 'Localité A–Z',
+  'sort.requiresPosition': 'Position requise',
+  'card.distance': '{distance} km',
 }

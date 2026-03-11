@@ -215,6 +215,40 @@
   appearance: auto;
 }
 
+/* Sort */
+.hsf-sort {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hsf-sort-label {
+  font-size: 13px;
+  color: var(--hsf-neutral-500);
+  white-space: nowrap;
+}
+
+.hsf-card-header-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Distance badge on cards */
+.hsf-card-distance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(235, 94, 18, 0.07);
+  color: var(--hsf-primary, var(--hsf-primary-fallback));
+  white-space: nowrap;
+}
+
 /* Service Filters */
 .hsf-filters {
   display: flex;
@@ -678,7 +712,8 @@
   }
 
   .hsf-toolbar-row .hsf-geolocation,
-  .hsf-toolbar-row .hsf-radius {
+  .hsf-toolbar-row .hsf-radius,
+  .hsf-toolbar-row .hsf-sort {
     justify-content: flex-start;
   }
 }
