@@ -1,6 +1,6 @@
 # PROJ-10: Backend Uebersetzungssystem (Datenmodell + API)
 
-## Status: Planned
+## Status: ✅ Deployed
 
 ## Abhaengigkeiten
 - Benoetigt: PROJ-3 (Service-Typen Verwaltung) - service_typen Tabelle muss existieren

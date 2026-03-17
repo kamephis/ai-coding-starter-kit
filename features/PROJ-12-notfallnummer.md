@@ -1,6 +1,6 @@
 # PROJ-12: Notfallnummer für Stützpunkte
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-2 (Stützpunkt-Verwaltung) - Basis-CRUD für Stützpunkte

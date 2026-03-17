@@ -1,6 +1,6 @@
 # PROJ-17: Autocomplete Suchvorschlaege
 
-## Status: Planned
+## Status: ✅ Deployed
 
 ## Abhaengigkeiten
 - Benoetigt: PROJ-6 (Storefinder Suche & Filter) - bestehende Suchleiste wird erweitert

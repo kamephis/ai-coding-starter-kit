@@ -1,6 +1,6 @@
 # PROJ-13: Map Zoom auf Stuetzpunkt bei Card-Klick
 
-## Status: Planned
+## Status: ✅ Deployed
 
 ## Abhaengigkeiten
 - Benoetigt: PROJ-5 (Kartenansicht) - LeafletMap-Komponente

@@ -1,6 +1,6 @@
 # PROJ-5: Storefinder Widget - Kartenansicht
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-2 (Stützpunkt-Verwaltung) - für Stützpunkt-Daten mit Koordinaten

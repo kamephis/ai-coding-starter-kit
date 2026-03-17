@@ -1,6 +1,6 @@
 # PROJ-7: Storefinder Widget - Stützpunkt-Liste & Cards
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-2 (Stützpunkt-Verwaltung) - für Stützpunkt-Daten

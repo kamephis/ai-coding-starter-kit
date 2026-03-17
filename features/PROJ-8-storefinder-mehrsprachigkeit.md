@@ -1,6 +1,6 @@
 # PROJ-8: Storefinder Widget - Mehrsprachigkeit (i18n)
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-4 (Widget-Konfiguration) - für Standard-Sprache

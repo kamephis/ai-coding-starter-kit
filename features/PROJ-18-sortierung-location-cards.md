@@ -1,6 +1,6 @@
 # PROJ-18: Sortierung der Location Cards
 
-## Status: Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-7 (Storefinder Liste/Cards) - für die Location Card Liste

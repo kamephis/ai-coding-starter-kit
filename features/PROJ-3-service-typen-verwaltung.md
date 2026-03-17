@@ -1,6 +1,6 @@
 # PROJ-3: Service-Typen Verwaltung (Backend)
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-1 (Admin-Authentifizierung) - für geschützten Backend-Zugriff

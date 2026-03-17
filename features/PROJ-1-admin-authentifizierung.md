@@ -1,6 +1,6 @@
 # PROJ-1: Admin-Authentifizierung
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Beschreibung
 Login-System für mehrere Administratoren, die Stützpunkte und Widget-Einstellungen im Backend verwalten.

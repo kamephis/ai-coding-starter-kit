@@ -1,6 +1,6 @@
 # PROJ-6: Storefinder Widget - Suche & Filter
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-2 (Stützpunkt-Verwaltung) - für Stützpunkt-Daten

@@ -1,6 +1,6 @@
 # PROJ-11: Admin Uebersetzungsverwaltung (UI)
 
-## Status: Planned
+## Status: ✅ Deployed
 
 ## Abhaengigkeiten
 - Benoetigt: PROJ-1 (Admin-Authentifizierung) - fuer geschuetzten Backend-Zugriff

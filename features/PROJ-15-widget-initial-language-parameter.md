@@ -1,6 +1,6 @@
 # PROJ-15: Widget initiale Sprache per Embed-Parameter
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-8 (Mehrsprachigkeit) - i18n-System muss vorhanden sein

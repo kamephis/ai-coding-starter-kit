@@ -1,6 +1,6 @@
 # PROJ-9: Storefinder Widget - Route zum Stuetzpunkt
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhaengigkeiten
 - Benoetigt: PROJ-5 (Kartenansicht) - fuer Leaflet-Karte und Marker

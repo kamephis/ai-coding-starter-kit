@@ -1,6 +1,6 @@
 # PROJ-4: Widget-Konfiguration & Snippet-Generator
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-1 (Admin-Authentifizierung) - für geschützten Backend-Zugriff

@@ -1,6 +1,6 @@
 # PROJ-14: CSV-Import für Stützpunkte
 
-## Status: 🔵 Planned
+## Status: ✅ Deployed
 
 ## Abhängigkeiten
 - Benötigt: PROJ-1 (Admin-Authentifizierung) – nur eingeloggte Admins dürfen importieren
