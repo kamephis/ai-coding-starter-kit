@@ -32,12 +32,19 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserEmail(user?.email ?? null)
     })
+    fetch('/api/widget-config')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.config?.logo_url) setLogoUrl(data.config.logo_url)
+      })
+      .catch(() => {})
   }, [])
 
   const handleLogout = async () => {
@@ -64,9 +71,18 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="flex h-14 items-center justify-between border-b px-4">
-          <span className="text-lg font-semibold text-sidebar-foreground">
-            Storefinder
-          </span>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt="Logo"
+              className="max-h-8 max-w-[140px] object-contain"
+            />
+          ) : (
+            <span className="text-lg font-semibold text-sidebar-foreground">
+              Storefinder
+            </span>
+          )}
           <Button
             variant="ghost"
             size="icon"

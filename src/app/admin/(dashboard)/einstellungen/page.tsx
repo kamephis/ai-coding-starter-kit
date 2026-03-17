@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Check, ClipboardCopy, Loader2, Save, Settings } from 'lucide-react'
+import { Check, ClipboardCopy, Image, Loader2, Save, Settings, Trash2, Upload } from 'lucide-react'
 
 interface WidgetConfig {
   map_provider: 'openstreetmap' | 'google_maps'
@@ -42,6 +42,10 @@ export default function EinstellungenPage() {
   const [copied, setCopied] = useState(false)
   const [snippetLang, setSnippetLang] = useState<string>('')
   const [snippetHideSwitcher, setSnippetHideSwitcher] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoError, setLogoError] = useState<string | null>(null)
+  const logoInputRef = useRef<HTMLInputElement | null>(null)
 
   const loadConfig = useCallback(async () => {
     setIsLoading(true)
@@ -58,6 +62,7 @@ export default function EinstellungenPage() {
         default_center_lng: data.config.default_center_lng,
         default_zoom: data.config.default_zoom,
       })
+      setLogoUrl(data.config.logo_url || null)
     }
     setIsLoading(false)
   }, [])
@@ -92,6 +97,48 @@ export default function EinstellungenPage() {
       setError(data.error)
     }
     setIsSaving(false)
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    // Reset input so same file can be re-selected
+    e.target.value = ''
+
+    setLogoError(null)
+    setLogoUploading(true)
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch('/api/logo', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      setLogoUrl(data.logo_url)
+    } else {
+      const data = await response.json()
+      setLogoError(data.error)
+    }
+    setLogoUploading(false)
+  }
+
+  const handleLogoDelete = async () => {
+    setLogoError(null)
+    setLogoUploading(true)
+
+    const response = await fetch('/api/logo', { method: 'DELETE' })
+
+    if (response.ok) {
+      setLogoUrl(null)
+    } else {
+      const data = await response.json()
+      setLogoError(data.error)
+    }
+    setLogoUploading(false)
   }
 
   useEffect(() => {
@@ -307,6 +354,93 @@ export default function EinstellungenPage() {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Firmenlogo */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Image className="h-5 w-5" />
+              Firmenlogo
+            </CardTitle>
+            <CardDescription>
+              Logo wird im Widget und im Admin-Panel angezeigt. Erlaubt: JPG, PNG, WebP, SVG (max. 1 MB)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {logoError && (
+              <Alert variant="destructive">
+                <AlertDescription>{logoError}</AlertDescription>
+              </Alert>
+            )}
+
+            {logoUrl ? (
+              <div className="flex items-center gap-6">
+                <div className="flex h-20 w-40 items-center justify-center rounded-md border bg-muted/30 p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={logoUrl}
+                    alt="Firmenlogo"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={logoUploading}
+                    onClick={() => logoInputRef.current?.click()}
+                  >
+                    {logoUploading ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="mr-2 h-4 w-4" />
+                    )}
+                    Ersetzen
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={logoUploading}
+                    onClick={handleLogoDelete}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Entfernen
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div className="flex h-20 w-40 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
+                  Kein Logo
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={logoUploading}
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  {logoUploading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Upload className="mr-2 h-4 w-4" />
+                  )}
+                  Logo hochladen
+                </Button>
+              </div>
+            )}
+
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,.svg"
+              className="hidden"
+              onChange={handleLogoUpload}
+            />
           </CardContent>
         </Card>
 

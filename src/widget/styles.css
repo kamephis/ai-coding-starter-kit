@@ -51,8 +51,16 @@
 /* Header */
 .hsf-header {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   padding: 8px 0;
+}
+
+/* Logo */
+.hsf-logo {
+  max-height: 40px;
+  max-width: 180px;
+  object-fit: contain;
 }
 
 /* Language Switcher */

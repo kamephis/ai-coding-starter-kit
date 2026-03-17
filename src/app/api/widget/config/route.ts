@@ -13,7 +13,7 @@ export async function GET(request: Request) {
 
   const { data, error } = await supabase
     .from('widget_config')
-    .select('map_provider, default_language, primary_color, default_radius_km, default_center_lat, default_center_lng, default_zoom')
+    .select('map_provider, default_language, primary_color, default_radius_km, default_center_lat, default_center_lng, default_zoom, logo_url')
     .single()
 
   if (error) {

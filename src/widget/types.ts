@@ -39,6 +39,7 @@ export interface WidgetConfig {
   default_center_lat: number
   default_center_lng: number
   default_zoom: number
+  logo_url: string | null
 }
 
 export interface RouteData {

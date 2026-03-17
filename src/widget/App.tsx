@@ -465,9 +465,18 @@ export function App({ apiBase, initialLang, hideLangSwitcher }: AppProps) {
     <I18nContext.Provider value={i18nValue}>
       <div className="hsf-root" style={{ '--hsf-primary': primaryColor } as React.CSSProperties}>
         {/* Header */}
-        {!hideLangSwitcher && (
+        {(config?.logo_url || !hideLangSwitcher) && (
           <div className="hsf-header">
-            <LanguageSwitcher primaryColor={primaryColor} />
+            {config?.logo_url && (
+              <img
+                src={config.logo_url}
+                alt=""
+                className="hsf-logo"
+              />
+            )}
+            {!hideLangSwitcher && (
+              <LanguageSwitcher primaryColor={primaryColor} />
+            )}
           </div>
         )}
 
