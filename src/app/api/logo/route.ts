@@ -58,15 +58,7 @@ export async function POST(request: Request) {
 
   const newLogoUrl = urlData.publicUrl
 
-  // 2. Get old logo_url to delete afterwards
-  const { data: configData } = await supabase
-    .from('widget_config')
-    .select('logo_url')
-    .single()
-
-  const oldLogoUrl = configData?.logo_url
-
-  // 3. Update widget_config with new logo_url
+  // 2. Update widget_config with new logo_url
   const { error: updateError } = await supabase
     .from('widget_config')
     .update({ logo_url: newLogoUrl })
@@ -76,11 +68,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: updateError.message }, { status: 500 })
   }
 
-  // 4. Delete old logo from storage (best-effort)
-  if (oldLogoUrl) {
-    const oldPath = extractStoragePath(oldLogoUrl)
-    if (oldPath) {
-      await supabase.storage.from(BUCKET).remove([oldPath])
+  // 3. Clean up all old logos in branding/ (handles race conditions too)
+  const { data: files } = await supabase.storage.from(BUCKET).list(LOGO_PREFIX)
+  if (files) {
+    const toDelete = files
+      .filter((f) => f.name !== fileName)
+      .map((f) => `${LOGO_PREFIX}${f.name}`)
+    if (toDelete.length > 0) {
+      await supabase.storage.from(BUCKET).remove(toDelete)
     }
   }
 

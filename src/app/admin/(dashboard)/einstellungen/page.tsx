@@ -45,6 +45,7 @@ export default function EinstellungenPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [logoUploading, setLogoUploading] = useState(false)
   const [logoError, setLogoError] = useState<string | null>(null)
+  const [logoDragOver, setLogoDragOver] = useState(false)
   const logoInputRef = useRef<HTMLInputElement | null>(null)
 
   const loadConfig = useCallback(async () => {
@@ -99,12 +100,7 @@ export default function EinstellungenPage() {
     setIsSaving(false)
   }
 
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    // Reset input so same file can be re-selected
-    e.target.value = ''
-
+  const uploadLogoFile = async (file: File) => {
     setLogoError(null)
     setLogoUploading(true)
 
@@ -124,6 +120,21 @@ export default function EinstellungenPage() {
       setLogoError(data.error)
     }
     setLogoUploading(false)
+  }
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    await uploadLogoFile(file)
+  }
+
+  const handleLogoDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setLogoDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (!file) return
+    await uploadLogoFile(file)
   }
 
   const handleLogoDelete = async () => {
@@ -368,7 +379,12 @@ export default function EinstellungenPage() {
               Logo wird im Widget und im Admin-Panel angezeigt. Erlaubt: JPG, PNG, WebP, SVG (max. 1 MB)
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent
+            className="space-y-4"
+            onDragOver={(e) => { e.preventDefault(); setLogoDragOver(true) }}
+            onDragLeave={() => setLogoDragOver(false)}
+            onDrop={handleLogoDrop}
+          >
             {logoError && (
               <Alert variant="destructive">
                 <AlertDescription>{logoError}</AlertDescription>
@@ -376,7 +392,7 @@ export default function EinstellungenPage() {
             )}
 
             {logoUrl ? (
-              <div className="flex items-center gap-6">
+              <div className={`flex items-center gap-6 rounded-md p-2 transition-colors ${logoDragOver ? 'bg-muted/60 ring-2 ring-primary ring-offset-2' : ''}`}>
                 <div className="flex h-20 w-40 items-center justify-center rounded-md border bg-muted/30 p-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -413,16 +429,18 @@ export default function EinstellungenPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-4">
+              <div
+                className={`flex cursor-pointer items-center gap-4 rounded-md p-2 transition-colors ${logoDragOver ? 'bg-muted/60 ring-2 ring-primary ring-offset-2' : ''}`}
+                onClick={() => logoInputRef.current?.click()}
+              >
                 <div className="flex h-20 w-40 items-center justify-center rounded-md border border-dashed text-sm text-muted-foreground">
-                  Kein Logo
+                  {logoDragOver ? 'Hier ablegen' : 'Kein Logo'}
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   disabled={logoUploading}
-                  onClick={() => logoInputRef.current?.click()}
                 >
                   {logoUploading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
