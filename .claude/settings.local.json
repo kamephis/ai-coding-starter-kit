@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "WebFetch(domain:zeroheight.com)",
+      "Bash(cmd /c \"npm install @supabase/ssr\")",
+      "Bash(powershell -Command \"Set-Location ''c:\\\\Users\\\\mb\\\\OneDrive - Heizmann\\\\Dokumente\\\\Projekte\\\\ai-coding-starter-kit''; npm install @supabase/ssr\")",
+      "Bash(git add:*)",
+      "Bash(git reset:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Implement complete Storefinder application \\(PROJ-1 through PROJ-8\\)\n\nBackend \\(Phase 1\\):\n- PROJ-1: Admin authentication with Supabase Auth, protected routes, admin management\n- PROJ-2: Stützpunkt CRUD with geocoding \\(Nominatim\\), image upload, search/sort/pagination\n- PROJ-3: Service types management with drag & drop sorting and icon picker\n\nBackend \\(Phase 2\\):\n- PROJ-4: Widget configuration \\(map provider, colors, language, radius\\) and embed snippet generator\n\nFrontend Widget \\(Phase 3\\):\n- PROJ-5: Leaflet map with markers, radius circle, geolocation, popup info\n- PROJ-6: Search bar with debounce, service filter chips \\(AND logic\\), Nominatim geocoding\n- PROJ-7: Location cards with contact links, service icons, opening hours, load more\n- PROJ-8: i18n system \\(DE/FR/IT\\) with language switcher, localStorage persistence\n\nIncludes SQL migration, feature specs, architecture overview, and Vite widget build.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git commit:*)",
+      "Bash(docker compose run:*)",
+      "Bash(npx vercel:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(npx supabase db push)",
+      "Bash(gh pr create:*)",
+      "Bash(cmd.exe /c \"where gh\")",
+      "Bash(npx supabase db push:*)",
+      "Bash(git log:*)",
+      "Bash(cd:*)",
+      "Bash(wc:*)",
+      "Bash(docker compose up:*)",
+      "Bash(docker compose:*)",
+      "Bash(node -e:*)",
+      "WebFetch(domain:ai-coding-starter-kit-ashen.vercel.app)",
+      "Bash(git -C \"c:/Users/mb/OneDrive - Heizmann/Dokumente/Projekte/ai-coding-starter-kit\" log --oneline -30)",
+      "Bash(python:*)",
+      "Bash(pip install:*)",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(docker run:*)"
+    ]
+  }
+}

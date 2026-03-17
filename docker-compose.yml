@@ -5,7 +5,7 @@ services:
       context: .
       target: dev
     ports:
-      - "3000:3000"
+      - "4000:3000"
     volumes:
       - .:/app
       - node_modules:/app/node_modules
@@ -18,7 +18,7 @@ services:
       context: .
       target: prod
     ports:
-      - "3000:3000"
+      - "4001:3000"
     environment:
       - NODE_ENV=production
 
